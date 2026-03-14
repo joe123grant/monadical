@@ -46,7 +46,7 @@ class Option[T]:
         Return an empty `Option`.
 
         Use this to represent "no value" explicitly, instead of `None`.
-        For the most part we want the helper functions in this class to handle this for you. 
+        For the most part we want the helper functions in this class to handle this for you.
         You shouldn't, in most circumstances, use this in its bare form.
 
         Returns:
@@ -56,6 +56,8 @@ class Option[T]:
             opt: Option[int] = Option.Empty()
         """
         return cast(Option[T], _EMPTY)
+
+    # ── State Checking ──
 
     def IsSome(self) -> bool:
         """
@@ -88,6 +90,8 @@ class Option[T]:
                 print("No value")
         """
         return isinstance(self, _Empty)
+
+    # ── Dunder Methods ──
 
     def __bool__(self) -> bool:
         """
@@ -146,6 +150,66 @@ class Option[T]:
             case _:
                 assert_never(self)
 
+    def __eq__(self, other: object) -> bool:
+        """
+        Structural equality for options.
+
+        Two options are equal if they are both `Empty`, or both `Some` with equal values.
+        Comparison with non-Option types returns `NotImplemented`.
+
+        Example:
+            Option.Some(42) == Option.Some(42)   # True
+            Option.Some(42) == Option.Some(99)   # False
+            Option.Empty() == Option.Empty()     # True
+            Option.Some(42) == Option.Empty()    # False
+        """
+        if not isinstance(other, Option):
+            return NotImplemented
+        match self, other:
+            case Some(value=a), Some(value=b):
+                return a == b
+            case _Empty(), _Empty():
+                return True
+            case _:
+                return False
+
+    def __hash__(self) -> int:
+        """
+        Hash support for options, consistent with `__eq__`.
+
+        Allows options to be used in sets and as dictionary keys.
+
+        Example:
+            s = {Option.Some(1), Option.Some(2), Option.Empty()}
+        """
+        match self:
+            case Some(value=v):
+                return hash(("Some", v))
+            case _Empty():
+                return hash(("Empty",))
+            case _:
+                assert_never(self)
+
+    def __or__(self, other: Option[T] | Callable[[], Option[T]]) -> Option[T]:
+        """
+        Operator sugar for fallback chains.
+
+        If `other` is a callable it is only invoked when `self` is empty (lazy).
+        If `other` is an `Option` it is used directly (eager).
+
+        Example:
+            first: Option[int] = Option.Empty()
+            second: Option[int] = Option.Some(42)
+
+            result = first | second
+            result = first | (lambda: second)
+        """
+        if self.IsSome():
+            return self
+        return other() if callable(other) else other
+
+    # ── Core Matching & Transformation ──
+
     def Match[R](self, onSome: Callable[[T], R], onEmpty: Callable[[], R]) -> R:
         """
         Exhaustively handle `Some` and `Empty` and produce an output.
@@ -191,6 +255,28 @@ class Option[T]:
         """
         return self.Match(lambda v: Some(func(v)), Option.Empty)
 
+    def BiMap[U](self, onSome: Callable[[T], U], onEmpty: Callable[[], U]) -> Option[U]:
+        """
+        Map both states of the option.
+
+        Unlike `Match` which exits the Option, `BiMap` stays in the Option world.
+        If `Some`, transforms the value. If `Empty`, produces a new value from the factory.
+        The result is always `Some`.
+
+        Args:
+            onSome: Transformation applied to the `Some` value.
+            onEmpty: Factory producing a value when empty.
+
+        Returns:
+            `Some(onSome(value))` if `Some`, or `Some(onEmpty())` if `Empty`.
+
+        Example:
+            opt: Option[int] = Option.Empty()
+            result: Option[int] = opt.BiMap(lambda x: x * 2, lambda: 0)
+            # result is Some(0)
+        """
+        return self.Match(lambda v: Some(onSome(v)), lambda: Some(onEmpty()))
+
     def Bind[U](self, func: Callable[[T], Option[U]]) -> Option[U]:
         """
         Chain an option-returning function.
@@ -212,6 +298,43 @@ class Option[T]:
             parsed: Option[int] = opt.Bind(ParseInt)
         """
         return self.Match(func, Option.Empty)
+
+    def Filter(self, predicate: Callable[[T], bool]) -> Option[T]:
+        """
+        Keep the value only if it satisfies a predicate.
+
+        `Filter` is for *validation*, not creation. It assumes you already have an
+        `Option` and lets you get rid of values that are Some but not acceptable
+        according to whatever the filter is.
+
+        This is especially useful in pipelines where values are:
+        - optional,
+        - normalised or transformed,
+        - then checked against domain constraints.
+
+        If the predicate fails, the `Option` becomes `Empty()` and the rest of the
+        pipeline carries on happily.
+
+        Args:
+            predicate: A function that returns True for acceptable values.
+
+        Returns:
+            The original `Option` when the value passes the predicate;
+            `Empty()` when it does not.
+
+        Example:
+            opt: Option[int] = Option.Some(50)
+            filtered: Option[int] = opt.Filter(lambda x: x > 100)
+
+            description = (
+                Option.FromNullableString("  Hello World  ", strip=True)
+                    .Map(lambda s: s.lower())
+                    .Filter(lambda s: len(s) <= 20)
+            )
+        """
+        return self.Match(lambda v: Some(v) if predicate(v) else Option.Empty(), Option.Empty)
+
+    # ── Static Constructors ──
 
     @staticmethod
     def FromNullable(value: T | None) -> Option[T]:
@@ -261,6 +384,48 @@ class Option[T]:
         return Option.Empty() if s == "" else Some(s)
 
     @staticmethod
+    def FromDict(data: dict, key: Any) -> Option[Any]:
+        """
+        Safe dictionary lookup returning an Option.
+
+        Use this instead of `dict.get(key)` when you want to stay in the Option world.
+        Treats missing keys *and* `None` values as `Empty`.
+
+        Args:
+            data: The dictionary to look up.
+            key: The key to search for.
+
+        Returns:
+            `Some(value)` if the key exists and value is not None, otherwise `Empty()`.
+
+        Example:
+            config = {"host": "localhost", "port": 8080}
+            host: Option[str] = Option.FromDict(config, "host")
+            missing: Option[str] = Option.FromDict(config, "timeout")
+        """
+        return Option.FromNullable(data.get(key))
+
+    @staticmethod
+    def FromBool(predicate: bool, value: T) -> Option[T]:
+        """
+        Create an Option based on a boolean predicate with an eager value.
+
+        Unlike `When` which takes a lazy factory, `FromBool` takes the value directly.
+        Use this when the value is cheap to produce or already computed.
+
+        Args:
+            predicate: Condition to include the value.
+            value: The value to wrap if predicate is true.
+
+        Returns:
+            `Some(value)` if predicate is true, otherwise `Empty()`.
+
+        Example:
+            opt: Option[str] = Option.FromBool(len(name) > 0, name)
+        """
+        return Some(value) if predicate else Option.Empty()
+
+    @staticmethod
     def When(predicate: bool, valueFactory: Callable[[], T]) -> Option[T]:
         """
         Conditionally create `Some(...)` based on a predicate.
@@ -287,7 +452,8 @@ class Option[T]:
         Capture exceptions and turn success/failure into `Some/Empty`.
 
         Use this when absence is an acceptable outcome and you do not want exceptions
-        to escape. This is only here to keep boilerplate down. But whenever you are using this function, it should probably be a Result monad you should be using.
+        to escape. This is only here to keep boilerplate down. But whenever you are using
+        this function, it should probably be a Result monad you should be using.
 
         Args:
             func: A callable that may raise an exception.
@@ -304,6 +470,8 @@ class Option[T]:
             return Some(func())
         except exceptions:
             return Option.Empty()
+
+    # ── Extraction ──
 
     def IfEmpty(self, fallback: Callable[[], T]) -> T:
         """
@@ -364,40 +532,7 @@ class Option[T]:
         """
         return self.Match(lambda v: v, lambda: (_raise(ValueError("Option is Empty"))))
 
-    def Filter(self, predicate: Callable[[T], bool]) -> Option[T]:
-        """
-        Keep the value only if it satisfies a predicate.
-
-        `Filter` is for *validation*, not creation. It'll assume you already have an
-        `Option` and lets you get rid of values that are Some but not acceptable
-        according to whatever the filter is.
-
-        This is especially useful in pipelines where values are:
-        - optional,
-        - normalised or transformed,
-        - then checked against domain constraints.
-
-        If the predicate fails, the `Option` becomes `Empty()` and the rest of the
-        pipeline carries on happily.
-
-        Args:
-            predicate: A function that returns True for acceptable values.
-
-        Returns:
-            The original `Option` when the value passes the predicate;
-            `Empty()` when it does not.
-
-        Example:
-            opt: Option[int] = Option.Some(50)
-            filtered: Option[int] = opt.Filter(lambda x: x > 100)
-
-            description = (
-                Option.FromNullableString("  Hello World  ", strip=True)
-                    .Map(lambda s: s.lower())
-                    .Filter(lambda s: len(s) <= 20)
-            )
-        """
-        return self.Match(lambda v: Some(v) if predicate(v) else Option.Empty(), Option.Empty)
+    # ── Predicate Checks ──
 
     def Exists(self, predicate: Callable[[T], bool]) -> bool:
         """
@@ -438,6 +573,25 @@ class Option[T]:
         """
         return self.Match(predicate, lambda: True)
 
+    def Contains(self, value: T) -> bool:
+        """
+        Check whether the option contains a specific value.
+
+        Args:
+            value: The value to check for.
+
+        Returns:
+            True if `Some(v)` and `v == value`, otherwise False.
+
+        Example:
+            opt = Option.Some(42)
+            opt.Contains(42)
+            opt.Contains(99)
+        """
+        return self.Exists(lambda v: v == value)
+
+    # ── Aggregation ──
+
     def Count(self) -> int:
         """
         Count elements in the option (0 or 1).
@@ -471,6 +625,30 @@ class Option[T]:
             total: int = opt.Fold(5, lambda accumulator, value: accumulator + value)
         """
         return self.Match(lambda v: folder(state, v), lambda: state)
+
+    def BiFold[S](self, state: S, someFolder: Callable[[S, T], S], emptyFolder: Callable[[S], S]) -> S:
+        """
+        Fold both states of the option into an accumulator.
+
+        Unlike `Fold` which only acts on `Some`, `BiFold` lets you transform the
+        accumulator in both cases. This is useful when the empty state needs to contribute
+        something to the final result.
+
+        Args:
+            state: Initial accumulator state.
+            someFolder: Combines (state, value) into a new state when `Some`.
+            emptyFolder: Transforms state when `Empty`.
+
+        Returns:
+            `someFolder(state, value)` if present; `emptyFolder(state)` if empty.
+
+        Example:
+            opt: Option[int] = Option.Empty()
+            result: str = opt.BiFold("status", lambda s, v: f"{s}: got {v}", lambda s: f"{s}: missing")
+        """
+        return self.Match(lambda v: someFolder(state, v), lambda: emptyFolder(state))
+
+    # ── Side Effects ──
 
     def Tap(self, action: Callable[[T], None]) -> Option[T]:
         """
@@ -520,6 +698,8 @@ class Option[T]:
             case _:
                 assert_never(self)
 
+    # ── Fallback ──
+
     def OrElse(self, fallback: Callable[[], Option[T]]) -> Option[T]:
         """
         Provide a fallback option if this one is empty.
@@ -538,6 +718,8 @@ class Option[T]:
             result: Option[int] = first.OrElse(lambda: second)
         """
         return self if self.IsSome() else fallback()
+
+    # ── Combining ──
 
     def Zip[U](self, other: Option[U]) -> Option[tuple[T, U]]:
         """
@@ -633,7 +815,7 @@ class Option[T]:
                 GetPort(),
                 GetTimeout(),
             ).MapN(lambda host, port, timeout: Config(host, port, timeout))
-            
+
             or if they all have the same shape:
             config = Option.All(GetHost(), GetPort(), GetTimeout()).MapN(config)
         """
@@ -680,22 +862,7 @@ class Option[T]:
         """
         return self.Map(lambda t: func(*t))
 
-    def Contains(self, value: T) -> bool:
-        """
-        Check whether the option contains a specific value.
-
-        Args:
-            value: The value to check for.
-
-        Returns:
-            True if `Some(v)` and `v == value`, otherwise False.
-
-        Example:
-            opt = Option.Some(42)
-            opt.Contains(42)
-            opt.Contains(99)
-        """
-        return self.Exists(lambda v: v == value)
+    # ── Flattening ──
 
     def Flatten(self: Option[Option[T]]) -> Option[T]:
         """
@@ -714,6 +881,49 @@ class Option[T]:
             flat = nestedEmpty.Flatten()  # Empty()
         """
         return self.Bind(lambda inner: inner)
+
+    # ── Conversion ──
+
+    def ToList(self) -> list[T]:
+        """
+        Convert the option to a list.
+
+        `Some(value)` becomes `[value]`, `Empty()` becomes `[]`.
+        Useful for interop with code that expects lists, or for aggregating
+        options into collections.
+
+        Returns:
+            A single-element list if `Some`, otherwise an empty list.
+
+        Example:
+            Option.Some(42).ToList()     # [42]
+            Option.Empty().ToList()      # []
+
+            # Useful for flattening a list of options:
+            items = [v for opt in options for v in opt.ToList()]
+        """
+        return self.Match(lambda v: [v], lambda: [])
+
+    def ToNullable(self) -> T | None:
+        """
+        Convert the option back to a nullable value.
+
+        Use this at boundaries where you need to hand the value back to code that
+        expects `T | None`, like third-party libraries, serialisation, or database drivers.
+
+        Returns:
+            The contained value if `Some`, otherwise `None`.
+
+        Example:
+            opt: Option[int] = Option.Some(42)
+            raw: int | None = opt.ToNullable()
+
+            empty: Option[int] = Option.Empty()
+            raw: int | None = empty.ToNullable()
+        """
+        return self.Match(lambda v: v, lambda: None)
+
+    # ── Async ──
 
     async def MatchAsync[R](self, onSome: Callable[[T], Awaitable[R]], onEmpty: Callable[[], Awaitable[R]]) -> R:
         """
