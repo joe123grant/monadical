@@ -7,13 +7,10 @@ from typing import (
     Callable,
     Iterator,
     Never,
+    Type,
     assert_never,
     cast,
-    TYPE_CHECKING,
 )
-
-if TYPE_CHECKING:
-    from ..result import Result
 
 class Option[T]:
     """
@@ -254,7 +251,7 @@ class Option[T]:
             otherwise Some(string).
 
         Example:
-            username: Option: str- = Option.FromNullableString("  alice  ", strip=True)
+            username: Option[str] = Option.FromNullableString("  alice  ", strip=True)
             empty: Option[str] = Option.FromNullableString("", strip=True)
         """
         if value is None:
@@ -367,38 +364,6 @@ class Option[T]:
         """
         return self.Match(lambda v: v, lambda: (_raise(ValueError("Option is Empty"))))
 
-    def UnwrapOr(self, fallback: Callable[[], T]) -> T:
-        """
-        Alias for `IfEmpty`: unwrap with a lazy fallback.
-
-        Args:
-            fallback: Produces a replacement value.
-
-        Returns:
-            The contained value if present, else `fallback()`.
-
-        Example:
-            opt: Option[int] = Option.Empty()
-            port: int = opt.UnwrapOr(lambda: GetDefault()) 
-        """
-        return self.IfEmpty(fallback)
-
-    def UnwrapOrValue(self, fallbackValue: T) -> T:
-        """
-        Alias for `IfEmptyValue`: unwrap with a constant fallback.
-
-        Args:
-            fallbackValue: Value used when empty.
-
-        Returns:
-            The contained value if present, else `fallbackValue`.
-
-        Example:
-            opt: Option[str] = Option.Empty()
-            name: str = opt.UnwrapOrValue("unknown")
-        """
-        return self.IfEmptyValue(fallbackValue)
-
     def Filter(self, predicate: Callable[[T], bool]) -> Option[T]:
         """
         Keep the value only if it satisfies a predicate.
@@ -413,7 +378,7 @@ class Option[T]:
         - then checked against domain constraints.
 
         If the predicate fails, the `Option` becomes `Empty()` and the rest of the
-        pipeline is carries on happily.
+        pipeline carries on happily.
 
         Args:
             predicate: A function that returns True for acceptable values.
@@ -438,7 +403,7 @@ class Option[T]:
         """
         Check whether a predicate ie a boolean expression holds against the contained value.
 
-        True is there is a value and it meets the criteria of the expression. Empty returns False.
+        True if there is a value and it meets the criteria of the expression. Empty returns False.
 
         Args:
             predicate: Expression to test.
@@ -482,8 +447,8 @@ class Option[T]:
             1 if `Some`, otherwise 0.
 
         Example:
-            total: Option[int] = Option.Some(42).Count()
-            total: Option[int] = Option.Empty().Count()
+            total: int = Option.Some(42).Count()
+            total: int = Option.Empty().Count()
         """
         return self.Match(lambda _: 1, lambda: 0)
 
@@ -555,24 +520,24 @@ class Option[T]:
             case _:
                 assert_never(self)
 
-    def OrElse(self, other: Option[T] | Callable[[], Option[T]]) -> Option[T]:
+    def OrElse(self, fallback: Callable[[], Option[T]]) -> Option[T]:
         """
         Provide a fallback option if this one is empty.
 
         Use this to implement fallback chains.
 
         Args:
-            other: A factory producing a fallback Option[T].
+            fallback: A factory producing a fallback Option[T].
 
         Returns:
-            `self` if it is `Some`, otherwise the fallback option.
+            `self` if it is `Some`, otherwise the result of `fallback()`.
 
         Example:
             first: Option[int] = Option.Empty()
             second: Option[int] = Option.Some(42)
             result: Option[int] = first.OrElse(lambda: second)
         """
-        return self if self.IsSome() else other()
+        return self if self.IsSome() else fallback()
 
     def Zip[U](self, other: Option[U]) -> Option[tuple[T, U]]:
         """
@@ -593,15 +558,37 @@ class Option[T]:
 
             optC: Option[int] = Option.Empty()
             pair: Option[tuple[int, int]] = optA.Zip(optC)
-
-            optA: Option[int] = Option.Some(1)
-            optB: Option[str] = Option.Some("x")
-            optC: Option[float] = Option.Some(1.5)
-
-            pair: Option[tuple[int, str]] = optA.Zip(optB)
-            triplet: Option[tuple[tuple[int, str], float]] = pair.Zip(optC)
         """
         return self.Bind(lambda a: other.Map(lambda b: (a, b)))
+
+    def ZipN(self, *others: Option[Any]) -> Option[tuple[Any, ...]]:
+        """
+        Combine this option with any number of other options into a single flat tuple.
+
+        This avoids the nested-tuple problem of chaining `Zip` where `a.Zip(b).Zip(c)`
+        produces `((a, b), c)`. Instead, `a.ZipN(b, c)` produces `(a, b, c)`.
+
+        If any option is `Empty`, the whole result is `Empty`.
+
+        Args:
+            *others: Any number of options to combine with this one.
+
+        Returns:
+            `Some((v1, v2, ...))` if all are `Some`, otherwise `Empty()`.
+
+        Example:
+            host: Option[str] = Option.Some("localhost")
+            port: Option[int] = Option.Some(8080)
+            timeout: Option[int] = Option.Some(30)
+
+            config: Option[tuple[str, int, int]] = host.ZipN(port, timeout)
+
+            config = (
+                host.ZipN(port, timeout)
+                    .MapN(lambda h, p, t: Config(h, p, t))
+            )
+        """
+        return Option.All(self, *others)
 
     def Map2[U, R](self, other: Option[U], func: Callable[[T, U], R]) -> Option[R]:
         """
@@ -670,7 +657,7 @@ class Option[T]:
         """
         Transform the contained tuple by unpacking it into the function arguments.
 
-        Use this after `All` to apply a constructor or function that takes multiple arguments.
+        Use this after `All` or `ZipN` to apply a constructor or function that takes multiple arguments.
 
         Args:
             func: Function to apply with unpacked tuple values as the arguments.
@@ -684,9 +671,12 @@ class Option[T]:
                 GetPort(),
                 GetTimeout(),
             ).MapN(lambda host, port, timeout: Config(host, port, timeout))
-            
-            or if they all have the same shape:
-            config = Option.All(GetHost(), GetPort(), GetTimeout()).MapN(config)
+
+            or instance-chained:
+            config = (
+                host.ZipN(port, timeout)
+                    .MapN(lambda h, p, t: Config(h, p, t))
+            )
         """
         return self.Map(lambda t: func(*t))
 
@@ -744,7 +734,7 @@ class Option[T]:
                 return "Guest"
 
             opt: Option[int] = Option.Some(123)
-            result = Option[int] await opt.MatchAsync(FetchUser, FetchDefault)
+            result = await opt.MatchAsync(FetchUser, FetchDefault)
         """
         match self:
             case Some(value=v):
@@ -804,28 +794,6 @@ class Option[T]:
             case _:
                 assert_never(self)
 
-    def ToResult(self, error: Exception) -> Result[T]:
-        """
-        Convert an `Option[T]` into a `Result[T]`, using a provided error for `Empty`.
-
-        Use this when absence should become a failure, typically at a boundary where you
-        need an error-carrying type rather than an optional.
-
-        Args:
-            error: Error used when the option is empty.
-
-        Returns:
-            `Result.Success(value)` for `Some(value)`, else `Result.Fail(error)`.
-
-        Example:
-            opt = Option.Some(42)
-            result = opt.ToResult(ValueError("Not found"))
-
-            empty: Option[int] = Option.Empty()
-            result = empty.ToResult(ValueError("Not found"))
-        """
-        from ..result import Result
-        return self.Match(Result.Success, lambda: Result.Fail(error))
 
 def _raise(exc: BaseException) -> Never:
     """
@@ -846,7 +814,7 @@ def _raise(exc: BaseException) -> Never:
     raise exc
 
 @dataclass(frozen=True, slots=True, repr=False)
-class Some(Option[T]):
+class Some[T](Option[T]):
     """
     Represents the presence of a value in an `Option`.
 
