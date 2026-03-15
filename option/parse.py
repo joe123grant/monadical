@@ -1,24 +1,23 @@
 from __future__ import annotations
-
 import re
 from datetime import date, datetime, time
 from decimal import Decimal, InvalidOperation
 from enum import Enum
 from typing import Any, Type
 from uuid import UUID
-
+import math
 from .option import Option, Some
-
 
 _TRUTHY: frozenset[str] = frozenset({"true", "1", "yes", "on", "y"})
 _FALSY: frozenset[str] = frozenset({"false", "0", "no", "off", "n"})
 
-
 def ParseInt(value: str | None, base: int = 10) -> Option[int]:
-    return Option.FromNullableString(value, strip=True).Bind(lambda s: Option.Try(lambda: int(s, base), ValueError))
+    return (
+        Option.FromNullableString(value, strip=True)
+            .Bind(lambda s: Option.Try(lambda: int(s, base), ValueError))
+    )
 
 def ParseFloat(value: str | None) -> Option[float]:
-    import math
     return (
         Option.FromNullableString(value, strip=True)
             .Bind(lambda s: Option.Try(lambda: float(s), ValueError))
@@ -32,20 +31,11 @@ def ParseDecimal(value: str | None) -> Option[Decimal]:
             .Filter(lambda d: d.is_finite())
     )
 
-
-def ParseBool(
-    value: str | None,
-    truthy: frozenset[str] = _TRUTHY,
-    falsy: frozenset[str] = _FALSY,
-) -> Option[bool]:
+def ParseBool(value: str | None, truthy: frozenset[str] = _TRUTHY, falsy: frozenset[str] = _FALSY) -> Option[bool]:
     return (
         Option.FromNullableString(value, strip=True)
-            .Map(lambda s: s.lower())
-            .Bind(lambda s:
-                Some(True) if s in truthy
-                else Some(False) if s in falsy
-                else Option.Empty()
-            )
+        .Map(str.lower)
+        .Bind(lambda s: Option.FromBool(s in truthy, True) | Option.FromBool(s in falsy, False))
     )
 
 def ParseDate(value: str | None, fmt: str = "%Y-%m-%d") -> Option[date]:
