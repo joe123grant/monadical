@@ -234,7 +234,6 @@ class Option[T]:
             case _:
                 assert_never(self)
 
-
 def _raise(exc: BaseException) -> Never:
     raise exc
 
