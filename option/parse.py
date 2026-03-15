@@ -31,9 +31,9 @@ def ParseDecimal(value: str | None) -> Option[Decimal]:
             .Filter(lambda d: d.is_finite())
     )
 
-def ParseBool(value: str | None, truthy: frozenset[str] = _TRUTHY, falsy: frozenset[str] = _FALSY) -> Option[bool]:
+def ParseBool(value: Any, truthy: frozenset[str] = _TRUTHY, falsy: frozenset[str] = _FALSY) -> Option[bool]:
     return (
-        Option.FromNullableString(value, strip=True)
+        Option.FromNullableString(str(value) if value is not None else None, strip=True)
         .Map(str.lower)
         .Bind(lambda s: Option.FromBool(s in truthy, True) | Option.FromBool(s in falsy, False))
     )

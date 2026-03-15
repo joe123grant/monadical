@@ -1,164 +1,93 @@
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable, Iterator
 from dataclasses import dataclass
-from typing import Callable, Generic, Never, TypeVar, assert_never, TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from ..option import Option
-
-T = TypeVar("T")
-U = TypeVar("U")
-R = TypeVar("R")
+from typing import Any, Never, assert_never
 
 
-class Result(Generic[T]):
-    """
-    A data type that models something that can succeed or fail. It exists as either `Success(value)` or `Fail(error)`.
-
-    Use this to model operations that may fail without relying on exceptions for control flow.
-    We get explicit, structured error handling, and we can keep pipelines fluent and reliable.
-
-    We would use this structure when an operation might fail, without having to bloat out all of our code with try catches.
-    Error handling is explicit rather than dilligence of the dev. 
-    """
+class Result[T]:
     @staticmethod
     def Success(value: T) -> Result[T]:
-        """
-        Wrap a successful value in a `Result`.
-
-        Use this when you *know* you have a successful value and want to return a `Result`
-        to match a flow that uses `Result` consistently. For the most part you should use `Try`, `Map`,
-        and `Bind` and keep it in a neat pipeline.
-
-        Args:
-            value: The successful value to wrap.
-
-        Returns:
-            A `Result[T]` representing success.
-
-        Example:
-            result = Result.Success(123)
-        """
-
         return Ok(value)
 
     @staticmethod
     def SuccessNonNull(value: T | None) -> Result[T]:
-        """
-        Convert a potentially-null value into a `Result`, failing if it is `None`.
-
-        Use this at boundaries where `None` may appear (library returns, dict lookups etc)
-        but `None` is not acceptable in your domain.
-
-        Depending on the pipeline this may be more appropriate than an Option
-
-        Args:
-            value: A value that may be None.
-
-        Returns:
-            `Success(value)` if not None, else `Fail(ValueError(...))`.
-
-        Example:
-            userId = Result.SuccessNonNull(row.get("userId"))
-        """
         return Result.Fail(ValueError("Value cannot be None")) if value is None else Ok(value)
 
     @staticmethod
     def Fail(error: Exception) -> Result[Never]:
-        """
-        Create a failed `Result` with an error.
-
-        Use this to represent a domain or validation failure explicitly, rather than throwing.
-        Helper functions like try, match, bind, map should be used rather than calling this explicitly.
-
-        Args:
-            error: The exception describing the failure.
-
-        Returns:
-            A failed `Result`.
-
-        Example:
-            return Result.Fail(ValueError("Invalid postcode"))
-        """
         return Failure(error)
 
     @staticmethod
     def Try(action: Callable[[], T], errorMapper: Callable[[Exception], Exception] = lambda x: x) -> Result[T]:
-        """
-        Capture exceptions and turn success/failure into `Success/Fail`.
-
-        Use this to keep boilerplate down when calling code that might throw, particularly
-        at integration or API boundaries. Inside pure domain logic you should ideally be returning
-        `Result` directly rather than throwing.
-
-        Args:
-            action: Work to execute.
-            errorMapper: Maps the caught exception into the error you want to store.
-
-        Returns:
-            `Success(value)` if no exception was raised, otherwise `Fail(mapped_error)`.
-
-        Example:
-            parsed = Result.Try(lambda: int(text), errorMapper=lambda ex: ValueError(str(ex)))
-        """
         try:
             return Result.Success(action())
         except Exception as ex:
             return Result.Fail(errorMapper(ex))
 
+    @staticmethod
+    def All(*results: Result[Any]) -> Result[tuple[Any, ...]]:
+        if not results:
+            return Result.Success(())
+        values: list[Any] = []
+        for r in results:
+            match r:
+                case Ok(value=v):
+                    values.append(v)
+                case Failure():
+                    return r  # type: ignore[return-value]
+                case _:
+                    assert_never(r)
+        return Result.Success(tuple(values))
+
     def IsSuccess(self) -> bool:
-        """
-        Check whether this result state is `Success`.
-
-        For use in if-statements etc for data flow. Most of the time we want to be using `Match`,
-        that way we are always handling both states this result can be in. Handy for quick
-        straggly bits of logic.
-
-        Returns:
-            True if this instance is `Success`, otherwise False.
-        """
         return isinstance(self, Ok)
 
     def IsFailure(self) -> bool:
-        """
-        Check whether this result state is `Fail`.
-
-        For use in if-statements etc for data flow. Most of the time we want to be using `Match`,
-        that way we are always handling both states this result can be in. Handy for quick
-        straggly bits of logic.
-
-        Returns:
-            True if this instance is `Fail`, otherwise False.
-        """
         return isinstance(self, Failure)
 
     def __bool__(self) -> bool:
-        """
-        Treat `Success` as truthy and `Fail` as falsy. More of a quality of life overload than anything.
-
-        Example:
-            if result:
-                proceed()
-        """
         return self.IsSuccess()
 
-    def Match(self, onSuccess: Callable[[T], R], onFailure: Callable[[Exception], R]) -> R:
-        """
-        Exhaustively handle `Success` and `Fail` and produce an output.
+    def __repr__(self) -> str:
+        match self:
+            case Ok(value=v):
+                return f"Ok({v!r})"
+            case Failure(error=e):
+                return f"Failure({e!r})"
+            case _:
+                assert_never(self)
 
-        Use this when you want a single expression that covers both cases and returns
-        something.
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Result):
+            return NotImplemented
+        match self, other:
+            case Ok(value=a), Ok(value=b):
+                return a == b
+            case Failure(error=a), Failure(error=b):
+                return type(a) is type(b) and str(a) == str(b)
+            case _:
+                return False
 
-        Args:
-            onSuccess: Called with the value if the result is successful.
-            onFailure: Called with the error if the result is failed.
+    def __hash__(self) -> int:
+        match self:
+            case Ok(value=v):
+                return hash(("Ok", v))
+            case Failure(error=e):
+                return hash(("Failure", type(e), str(e)))
+            case _:
+                assert_never(self)
 
-        Returns:
-            The result of either `onSuccess(value)` or `onFailure(error)`.
+    def __iter__(self) -> Iterator[T]:
+        match self:
+            case Ok(value=v):
+                yield v
+            case Failure():
+                return
+            case _:
+                assert_never(self)
 
-        Example:
-            message = result.Match(lambda v: f"OK: {v}", lambda e: f"Failed: {e}")
-        """
+    def Match[R](self, onSuccess: Callable[[T], R], onFailure: Callable[[Exception], R]) -> R:
         match self:
             case Ok(value=v):
                 return onSuccess(v)
@@ -167,23 +96,7 @@ class Result(Generic[T]):
             case _:
                 assert_never(self)
 
-    def Map(self, func: Callable[[T], U]) -> Result[U]:
-        """
-        Transform the contained value if `Success`.
-
-        Use this for pure transformations where the function returns a normal value.
-        If the result is a failure, it stays a failure. If the mapping throws, it becomes a failure.
-
-        Args:
-            func: Transformation applied to the success value.
-
-        Returns:
-            `Success(func(value))` if successful, otherwise the original failure.
-            If the `func` raises, then it returns `Fail(exception)`.
-
-        Example:
-            upper = result.Map(lambda s: s.upper())
-        """
+    def Map[U](self, func: Callable[[T], U]) -> Result[U]:
         def _onSuccess(v: T) -> Result[U]:
             try:
                 return Ok(func(v))
@@ -192,25 +105,22 @@ class Result(Generic[T]):
 
         return self.Match(_onSuccess, Failure)
 
-    def Bind(self, func: Callable[[T], Result[U]]) -> Result[U]:
-        """
-        Chain a result-returning function.
+    def BiMap[U](self, onSuccess: Callable[[T], U], onFailure: Callable[[Exception], Exception]) -> Result[U]:
+        match self:
+            case Ok(value=v):
+                try:
+                    return Ok(onSuccess(v))
+                except Exception as ex:
+                    return Failure(ex)
+            case Failure(error=e):
+                return Failure(onFailure(e))
+            case _:
+                assert_never(self)
 
-        Use this when the next step may also fail and returns a `Result`.
-        This keeps pipelines flat ie it avoids nested `Result[Result[T]]` and preserves errors.
+    def MapError(self, func: Callable[[Exception], Exception]) -> Result[T]:
+        return self.Match(lambda _: self, lambda e: Failure(func(e)))
 
-        If the binder throws, that exception becomes a failure.
-
-        Args:
-            func: A function that returns a `Result`.
-
-        Returns:
-            The result of `func(value)` if successful; otherwise the original failure.
-            If `func` raises, returns `Fail(exception)`.
-
-        Example:
-            result = read_config().Bind(validate_config).Bind(connect)
-        """
+    def Bind[U](self, func: Callable[[T], Result[U]]) -> Result[U]:
         def _onSuccess(v: T) -> Result[U]:
             try:
                 return func(v)
@@ -219,22 +129,19 @@ class Result(Generic[T]):
 
         return self.Match(_onSuccess, Failure)
 
+    def Filter(self, predicate: Callable[[T], bool], error: Exception) -> Result[T]:
+        return self.Match(lambda v: self if predicate(v) else Result.Fail(error), lambda _: self)
+
+    def OrElse(self, fallback: Callable[[], Result[T]]) -> Result[T]:
+        return self if self.IsSuccess() else fallback()
+
+    def Recover(self, func: Callable[[Exception], T]) -> Result[T]:
+        return self.Match(lambda _: self, lambda e: Result.Try(lambda: func(e)))
+
+    def RecoverValue(self, value: T) -> Result[T]:
+        return self if self.IsSuccess() else Result.Success(value)
+
     def Tap(self, action: Callable[[T], None]) -> Result[T]:
-        """
-        Execute a side-effect on the value if successful, returning the original result.
-
-        You can use this for logging, metrics, debugging, saving to disk etc whilst still keeping
-        the pipeline fluent. Keep in mind that if your side effect can fail then you should be using TryTap
-
-        Args:
-            action: Side-effect executed with the success value.
-
-        Returns:
-            The original `Result`.
-
-        Example:
-            result.Tap(lambda v: logger.info(f"Loaded {v}"))
-        """
         def _onSuccess(v: T) -> Result[T]:
             action(v)
             return self
@@ -242,21 +149,6 @@ class Result(Generic[T]):
         return self.Match(_onSuccess, lambda _: self)
 
     def TryTap(self, action: Callable[[T], None], errorMapper: Callable[[Exception], Exception] = lambda x: x) -> Result[T]:
-        """
-        Execute a side-effect on success, converting any thrown exception into a failure.
-
-        Use this when the side-effect is not trustworthy and you want failures to be captured rather than exploding out of the pipeline.
-
-        Args:
-            action: Side-effect executed with the success value.
-            errorMapper: Maps any exception thrown by `action`.
-
-        Returns:
-            The original `Result` if the side-effect succeeds; otherwise `Fail(mapped_error)`.
-
-        Example:
-            saved = result.TryTap(lambda v: WriteToDisk(v), errorMapper=lambda ex: IOError(str(ex)))
-        """
         def _onSuccess(v: T) -> Result[T]:
             try:
                 action(v)
@@ -267,23 +159,6 @@ class Result(Generic[T]):
         return self.Match(_onSuccess, Failure)
 
     def TapFail(self, action: Callable[[Exception], None]) -> Result[T]:
-        """
-        Execute a side-effect if the result is a failure, returning the original result.
-
-        Use this for logging, metrics and debugging while keeping the pipeline fluent.
-        This does not catch exceptions from `action` — it will throw.
-
-        If you want side-effects that *cannot* throw out of the pipeline, use `TryTapFail`.
-
-        Args:
-            action: Side-effect executed with the error.
-
-        Returns:
-            The original `Result`.
-
-        Example:
-            result.TapFail(lambda e: logger.warning(f"Failed: {e}"))
-        """
         def _onFailure(e: Exception) -> Result[T]:
             action(e)
             return self
@@ -291,21 +166,6 @@ class Result(Generic[T]):
         return self.Match(lambda _: self, _onFailure)
 
     def TryTapFail(self, action: Callable[[Exception], None], errorMapper: Callable[[Exception], Exception] = lambda x: x) -> Result[T]:
-        """
-        Execute a side-effect on failure, converting any thrown exception into a failure.
-
-        This is the failure-side mirror of `TryTap`.
-
-        Args:
-            action: Side-effect executed with the error.
-            errorMapper: Maps any exception thrown by `action`.
-
-        Returns:
-            The original `Result` if the side-effect succeeds; otherwise `Fail(mapped_error)`.
-
-        Example:
-            result = result.TryTapFail(lambda e: Report(e), errorMapper=lambda ex: RuntimeError(str(ex)))
-        """
         def _onFailure(e: Exception) -> Result[T]:
             try:
                 action(e)
@@ -316,80 +176,83 @@ class Result(Generic[T]):
         return self.Match(lambda _: self, _onFailure)
 
     def IfFail(self, fallback: Callable[[Exception], T]) -> T:
-        """
-        Extract the success value, or compute a fallback if failed.
-
-        Use this when you want a final `T` and you can produce a default lazily,
-        potentially using the error.
-
-        Args:
-            fallback: Produces a replacement value given the error.
-
-        Returns:
-            The success value if present; otherwise `fallback(error)`.
-
-        Example:
-            port = result.IfFail(FetchPortFromConfig)
-        """
         return self.Match(lambda v: v, fallback)
 
     def IfFailValue(self, fallbackValue: T) -> T:
-        """
-        Extract the success value, or return a provided fallback value.
-
-        Use this when you have a simple constant default.
-
-        Args:
-            fallbackValue: Value used when failed.
-
-        Returns:
-            The success value if present; otherwise `fallbackValue`.
-
-        Example:
-            someName = result.IfFailValue("Jonan the barbarian")
-        """
         return self.IfFail(lambda _: fallbackValue)
 
-    def ToOption(self) -> Option[T]:
-        """
-        Convert a `Result[T]` into an `Option[T]`, discarding the error.
+    def Zip[U](self, other: Result[U]) -> Result[tuple[T, U]]:
+        return self.Bind(lambda a: other.Map(lambda b: (a, b)))
 
-        Use this when you are intentionally stepping down from "I care why it failed"
-        to "I only care whether I got a value". This is a destructive way of doing things. Approach with care. 
+    def ZipN(self, *others: Result[Any]) -> Result[tuple[Any, ...]]:
+        return Result.All(self, *others)
 
-        Returns:
-            `Some(value)` if success, otherwise `Empty()`.
+    def Map2[U, R](self, other: Result[U], func: Callable[[T, U], R]) -> Result[R]:
+        return self.Zip(other).Map(lambda t: func(t[0], t[1]))
 
-        Example:
-            optionalUser = resultUser.ToOption()
-        """
-        from ..option import Option
-        return self.Match(Option.Some, lambda _: Option.Empty())
+    def MapN[R](self, func: Callable[..., R]) -> Result[R]:
+        return self.Map(lambda t: func(*t))
+
+    def Flatten(self: Result[Result[T]]) -> Result[T]:
+        return self.Bind(lambda inner: inner)
+
+    def Exists(self, predicate: Callable[[T], bool]) -> bool:
+        return self.Match(predicate, lambda _: False)
+
+    def ForAll(self, predicate: Callable[[T], bool]) -> bool:
+        return self.Match(predicate, lambda _: True)
+
+    def Contains(self, value: T) -> bool:
+        return self.Exists(lambda v: v == value)
+
+    def Count(self) -> int:
+        return self.Match(lambda _: 1, lambda _: 0)
+
+    def Fold[S](self, state: S, folder: Callable[[S, T], S]) -> S:
+        return self.Match(lambda v: folder(state, v), lambda _: state)
+
+    def BiFold[S](self, state: S, successFolder: Callable[[S, T], S], failureFolder: Callable[[S, Exception], S]) -> S:
+        return self.Match(lambda v: successFolder(state, v), lambda e: failureFolder(state, e))
+
+    def ToList(self) -> list[T]:
+        return self.Match(lambda v: [v], lambda _: [])
+
+    def ToNullable(self) -> T | None:
+        return self.Match(lambda v: v, lambda _: None)
+
+    async def MatchAsync[R](self, onSuccess: Callable[[T], Awaitable[R]], onFailure: Callable[[Exception], Awaitable[R]]) -> R:
+        match self:
+            case Ok(value=v):
+                return await onSuccess(v)
+            case Failure(error=e):
+                return await onFailure(e)
+            case _:
+                assert_never(self)
+
+    async def MapAsync[U](self, func: Callable[[T], Awaitable[U]]) -> Result[U]:
+        match self:
+            case Ok(value=v):
+                return Ok(await func(v))
+            case Failure():
+                return self  # type: ignore[return-value]
+            case _:
+                assert_never(self)
+
+    async def BindAsync[U](self, func: Callable[[T], Awaitable[Result[U]]]) -> Result[U]:
+        match self:
+            case Ok(value=v):
+                return await func(v)
+            case Failure():
+                return self  # type: ignore[return-value]
+            case _:
+                assert_never(self)
 
 
-@dataclass(frozen=True, slots=True)
-class Ok(Result[T]):
-    """
-    Represents a successful computation in a `Result`.
-
-    Attributes:
-        value: The successful value.
-
-    Example:
-        result = Ok(10)
-    """
+@dataclass(frozen=True, slots=True, repr=False)
+class Ok[T](Result[T]):
     value: T
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, repr=False)
 class Failure(Result[Never]):
-    """
-    Represents a failed computation in a `Result`.
-
-    Attributes:
-        error: The error describing the failure.
-
-    Example:
-        result = Failure(ValueError("Botched it"))
-    """
     error: Exception
