@@ -1,9 +1,6 @@
 from __future__ import annotations
-
 from pathlib import Path
-
 from .option import Option
-
 
 def IsFile(path: Path) -> bool:
     return path.is_file()
