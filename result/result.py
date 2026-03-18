@@ -35,7 +35,7 @@ class Result[T]:
                 case Ok(value=v):
                     values.append(v)
                 case Failure():
-                    return r  # type: ignore[return-value]
+                    return r
                 case _:
                     assert_never(r)
         return Result.Success(tuple(values))
@@ -234,7 +234,7 @@ class Result[T]:
             case Ok(value=v):
                 return Ok(await func(v))
             case Failure():
-                return self  # type: ignore[return-value]
+                return self
             case _:
                 assert_never(self)
 
@@ -243,7 +243,7 @@ class Result[T]:
             case Ok(value=v):
                 return await func(v)
             case Failure():
-                return self  # type: ignore[return-value]
+                return self
             case _:
                 assert_never(self)
 
