@@ -5,7 +5,7 @@ import math
 from datetime import date, datetime, time
 from decimal import Decimal, InvalidOperation
 from enum import Enum
-from typing import Any, Type
+from typing import Any
 from uuid import UUID
 
 from .result import Result
@@ -82,7 +82,7 @@ def ParseUuid(value: str | None) -> Result[UUID]:
         .Bind(lambda s: Result.Try(lambda: UUID(s), lambda e: ValueError(f"ParseUuid: cannot parse {value!r}: {e}")))
     )
 
-def ParseEnum(value: str | None, enum_type: Type[Enum], case_sensitive: bool = False) -> Result[Enum]:
+def ParseEnum(value: str | None, enum_type: type[Enum], case_sensitive: bool = False) -> Result[Enum]:
     def _lookup(s: str) -> Result[Enum]:
         key = s if case_sensitive else s.upper()
         for member in enum_type:

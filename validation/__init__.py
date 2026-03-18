@@ -1,4 +1,4 @@
-from .validation import Validation, Valid, Invalid
+from .validation import Validation, Valid, Invalid, Validator, Rule
 from .path import ValidateFile, ValidateDirectory, ValidateVisibleFile
 from .io import ReadText, ReadBytes, ReadLines, ReadJson, ParseJson
 from .combinators import Valids, Sequence, Traverse, Partition, Choose
@@ -13,6 +13,8 @@ __all__ = [
     "Validation",
     "Valid",
     "Invalid",
+    "Validator",
+    "Rule",
     "ValidateFile",
     "ValidateDirectory",
     "ValidateVisibleFile",

@@ -3,7 +3,7 @@ import re
 from datetime import date, datetime, time
 from decimal import Decimal, InvalidOperation
 from enum import Enum
-from typing import Any, Type
+from typing import Any
 from uuid import UUID
 import math
 from .option import Option, Some
@@ -62,7 +62,7 @@ def ParseUuid(value: str | None) -> Option[UUID]:
             .Bind(lambda s: Option.Try(lambda: UUID(s), ValueError))
     )
 
-def ParseEnum(value: str | None, enum_type: Type[Enum], case_sensitive: bool = False) -> Option[Enum]:
+def ParseEnum(value: str | None, enum_type: type[Enum], case_sensitive: bool = False) -> Option[Enum]:
     def _lookup(s: str) -> Option[Enum]:
         key = s if case_sensitive else s.upper()
         for member in enum_type:

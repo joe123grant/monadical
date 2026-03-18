@@ -1,5 +1,6 @@
 from __future__ import annotations
-from typing import Any, Callable, Iterable
+from collections.abc import Callable, Iterable
+from typing import Any
 from .result import Result
 
 def Oks(results: Iterable[Result[Any]]) -> list[Any]:

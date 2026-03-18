@@ -16,12 +16,12 @@ def ValidateEnv(key: str) -> Validation[str, str]:
 
 
 def ValidateEnvInt(key: str, base: int = 10) -> Validation[int, str]:
-    return ValidateEnv(key).Bind(lambda v: ParseInt(v, base))
+    return ValidateEnv(key).Then(lambda v: ParseInt(v, base))
 
 
 def ValidateEnvFloat(key: str) -> Validation[float, str]:
-    return ValidateEnv(key).Bind(ParseFloat)
+    return ValidateEnv(key).Then(ParseFloat)
 
 
 def ValidateEnvBool(key: str) -> Validation[bool, str]:
-    return ValidateEnv(key).Bind(ParseBool)
+    return ValidateEnv(key).Then(ParseBool)
