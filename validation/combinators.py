@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable
-from typing import Any
+from typing import Any, Callable, Iterable
 
 from .validation import Validation, Valid, Invalid
 

@@ -1,27 +1,48 @@
 from __future__ import annotations
 
-import os
+from typing import Any, Callable, Iterable
 
-from .validation import Validation
-from .parse import ParseBool, ParseFloat, ParseInt
-
-
-def ValidateEnv(key: str) -> Validation[str, str]:
-    val = os.environ.get(key)
-    if val is None:
-        return Validation.Fail([f"Environment variable {key!r} is not set"])
-    if not val.strip():
-        return Validation.Fail([f"Environment variable {key!r} is empty"])
-    return Validation.Success(val)
+from .validation import Validation, Valid, Invalid
 
 
-def ValidateEnvInt(key: str, base: int = 10) -> Validation[int, str]:
-    return ValidateEnv(key).Then(lambda v: ParseInt(v, base))
+def Valids(validations: Iterable[Validation[Any, Any]]) -> list[Any]:
+    out: list[Any] = []
+    for v in validations:
+        v.Match(out.append, lambda _: None)
+    return out
 
 
-def ValidateEnvFloat(key: str) -> Validation[float, str]:
-    return ValidateEnv(key).Then(ParseFloat)
+def Sequence(validations: Iterable[Validation[Any, Any]]) -> Validation[list[Any], Any]:
+    values: list[Any] = []
+    errors: list[Any] = []
+
+    for v in validations:
+        match v:
+            case Valid(value=val):
+                values.append(val)
+            case Invalid(errors=errs):
+                errors.extend(errs)
+
+    return Invalid(errors) if errors else Valid(values)
 
 
-def ValidateEnvBool(key: str) -> Validation[bool, str]:
-    return ValidateEnv(key).Then(ParseBool)
+def Traverse(items: Iterable[Any], func: Callable[[Any], Validation[Any, Any]]) -> Validation[list[Any], Any]:
+    return Sequence(func(item) for item in items)
+
+
+def Partition(validations: Iterable[Validation[Any, Any]]) -> tuple[list[Any], list[Any]]:
+    values: list[Any] = []
+    errors: list[Any] = []
+
+    for v in validations:
+        match v:
+            case Valid(value=val):
+                values.append(val)
+            case Invalid(errors=errs):
+                errors.extend(errs)
+
+    return values, errors
+
+
+def Choose(items: Iterable[Any], func: Callable[[Any], Validation[Any, Any]]) -> list[Any]:
+    return Valids(func(item) for item in items)
