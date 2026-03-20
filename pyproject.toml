@@ -1,0 +1,15 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "monadical"
+version = "0.1.0"
+description = "Monadic types for Python"
+requires-python = ">=3.10"
+
+[tool.setuptools]
+packages = ["monadical", "monadical.option", "monadical.result", "monadical.state", "monadical.validation"]
+
+[tool.setuptools.package-dir]
+"monadical" = "."
