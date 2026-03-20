@@ -13,3 +13,6 @@ packages = ["monadical", "monadical.option", "monadical.result", "monadical.stat
 
 [tool.setuptools.package-dir]
 "monadical" = "."
+
+[tool.setuptools.package-data]
+monadical = ["py.typed"]
