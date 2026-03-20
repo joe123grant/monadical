@@ -70,6 +70,9 @@ class Option[T]:
             return self
         return other() if callable(other) else other
 
+    def __rshift__[U](self, func: Callable[[T], Option[U]]) -> Option[U]:
+        return self.Bind(func)
+
     def Match[R](self, onSome: Callable[[T], R], onEmpty: Callable[[], R]) -> R:
         match self:
             case Some(value=v):

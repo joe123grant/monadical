@@ -49,6 +49,14 @@ class Result[T]:
     def __bool__(self) -> bool:
         return self.IsSuccess()
 
+    def __or__(self, other: Result[T] | Callable[[], Result[T]]) -> Result[T]:
+        if self.IsSuccess():
+            return self
+        return other() if callable(other) else other
+
+    def __rshift__[U](self, func: Callable[[T], Result[U]]) -> Result[U]:
+        return self.Bind(func)
+
     def __repr__(self) -> str:
         match self:
             case Ok(value=v):
