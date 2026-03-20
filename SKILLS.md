@@ -51,10 +51,10 @@ def ProcessUser(userId: str) -> Option[User]:
 
 ### Favour operators over verbose method calls
 
-| Verbose | Operator | Meaning |
-|---|---|---|
-| `option.Bind(f)` | `option >> f` | Monadic bind |
-| `option.OrElse(lambda: fallback)` | `option \| fallback` | Fallback/alternative |
+| Verbose                                | Operator                    | Meaning                    |
+| -------------------------------------- | --------------------------- | -------------------------- |
+| `option.Bind(f)`                       | `option >> f`               | Monadic bind               |
+| `option.OrElse(lambda: fallback)`      | `option \| fallback`        | Fallback/alternative       |
 | `validation1.Apply(validation2, pair)` | `validation1 & validation2` | Error-accumulating combine |
 
 ### Prefer `Match` for terminal decisions
@@ -79,6 +79,7 @@ response = (
 ### When to use `Option`
 
 Use `Option[T]` when:
+
 - A value **may or may not exist**, and absence is not an error (no blame to assign)
 - Reading from a dict, environment variable, nullable field, or config
 - Implementing soft lookups where "not found" is a normal outcome
@@ -318,6 +319,7 @@ def ResolveProfilePicture(rawId: str) -> str:
 ### When to use `Result`
 
 Use `Result[T]` when:
+
 - An operation **can fail**, and the failure carries **diagnostic information** (an exception)
 - Replacing `try/except` blocks in pipelines
 - Calling external services, databases, or parsing user input where errors must propagate
@@ -383,6 +385,7 @@ config = (
 ### Map vs Bind
 
 Same rule as `Option`:
+
 - `Map` — plain transform, exceptions are caught and become `Failure`
 - `Bind` (or `>>`) — chains to another `Result`-returning step
 
@@ -535,6 +538,7 @@ config = FetchConfig("production").IfFail(
 ### When to use `Validation`
 
 Use `Validation[T, E]` when:
+
 - You need to **collect all errors** rather than stopping at the first
 - Validating a form, request body, or domain object where the user benefits from seeing every problem at once
 - Composing multiple independent validation rules against the same input
@@ -739,6 +743,7 @@ def ValidateRegistration(data: dict) -> Validation[NewUser, str]:
 ### When to use `State`
 
 Use `State[S, A]` when:
+
 - A computation **reads from and/or writes to** shared state, and you want to keep that state explicit
 - Building interpreters, configuration systems, counters, or accumulation pipelines
 - You want pure, testable functions that thread state without global variables or mutation
@@ -1092,20 +1097,20 @@ validValues   = Valids([val1, val2, val3])  # list[T]
 
 ## 8. Choosing the Right Monad
 
-| Scenario | Use |
-|---|---|
-| Value might not exist; absence is normal | `Option` |
-| Operation might fail; one failure mode | `Result` |
-| Validating input; want all errors at once | `Validation` |
-| Computation threads shared state | `State` |
-| Reading optional config / env vars | `Option` |
-| Required config / env vars | `Result` |
-| Validating a form or request body | `Validation` |
-| Calling an API that can fail | `Result` |
-| Building a config object step by step | `State` |
-| Filter-mapping a collection | `Option.Choose` or `Result.Choose` |
-| Batch-validate a collection | `Validation.Sequence` |
-| Sequential steps with shared mutable context | `State` |
+| Scenario                                     | Use                                |
+| -------------------------------------------- | ---------------------------------- |
+| Value might not exist; absence is normal     | `Option`                           |
+| Operation might fail; one failure mode       | `Result`                           |
+| Validating input; want all errors at once    | `Validation`                       |
+| Computation threads shared state             | `State`                            |
+| Reading optional config / env vars           | `Option`                           |
+| Required config / env vars                   | `Result`                           |
+| Validating a form or request body            | `Validation`                       |
+| Calling an API that can fail                 | `Result`                           |
+| Building a config object step by step        | `State`                            |
+| Filter-mapping a collection                  | `Option.Choose` or `Result.Choose` |
+| Batch-validate a collection                  | `Validation.Sequence`              |
+| Sequential steps with shared mutable context | `State`                            |
 
 ### Decision tree
 
@@ -1212,11 +1217,11 @@ async def HandleRequest(rawId: str) -> Response:
 
 ### Async naming conventions
 
-| Sync | Async |
-|---|---|
-| `Map(func)` | `MapAsync(asyncFunc)` |
+| Sync                | Async                  |
+| ------------------- | ---------------------- |
+| `Map(func)`         | `MapAsync(asyncFunc)`  |
 | `Bind(func)` / `>>` | `BindAsync(asyncFunc)` |
-| `Match(onA, onB)` | `MatchAsync(onA, onB)` |
+| `Match(onA, onB)`   | `MatchAsync(onA, onB)` |
 
 Note: `>>` does not have an async variant — use `.BindAsync()` explicitly for async steps.
 
@@ -1395,13 +1400,14 @@ ids, _ = Replicate(5, GenerateId).Run(1)
 
 ## Naming Quick Reference
 
-| Category | Convention | Example |
-|---|---|---|
-| Types | PascalCase | `Option`, `Result`, `Validation`, `State`, `User`, `Config` |
-| Functions | PascalCase, verb-first | `FindUser`, `ParseAge`, `ValidateEmail`, `BuildConfig` |
-| Boolean functions | PascalCase, question form | `IsSome`, `IsEmpty`, `HasErrors`, `IsSuccess`, `IsFailure`, `IsAdult` |
-| Variables | camelCase | `rawId`, `maybeUser`, `userResult`, `parsedAge` |
-| Lambdas (inline) | camelCase parameter names | `lambda userId: ...`, `lambda err: ...` |
-| Predicates passed to rules | PascalCase | `IsNonEmpty`, `IsValidEmail`, `IsAdult` |
+| Category                   | Convention                | Example                                                               |
+| -------------------------- | ------------------------- | --------------------------------------------------------------------- |
+| Types                      | PascalCase                | `Option`, `Result`, `Validation`, `State`, `User`, `Config`           |
+| Functions                  | PascalCase, verb-first    | `FindUser`, `ParseAge`, `ValidateEmail`, `BuildConfig`                |
+| Boolean functions          | PascalCase, question form | `IsSome`, `IsEmpty`, `HasErrors`, `IsSuccess`, `IsFailure`, `IsAdult` |
+| Variables                  | camelCase                 | `rawId`, `maybeUser`, `userResult`, `parsedAge`                       |
+| Lambdas (inline)           | camelCase parameter names | `lambda userId: ...`, `lambda err: ...`                               |
+| Predicates passed to rules | PascalCase                | `IsNonEmpty`, `IsValidEmail`, `IsAdult`                               |
+| No abbreviations ever      | Over all Rule             | `cxt should be context`, `lambda v: ... should be lambda value: ...`  |
 
 ---
