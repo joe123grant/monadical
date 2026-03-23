@@ -16,3 +16,10 @@ packages = ["monadical", "monadical.option", "monadical.result", "monadical.stat
 
 [tool.setuptools.package-data]
 monadical = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+
+[project.optional-dependencies]
+test = ["pytest>=8.0", "pytest-asyncio>=0.23"]
