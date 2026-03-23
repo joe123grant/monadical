@@ -10,13 +10,12 @@ if TYPE_CHECKING:
 
 
 def Rule[T, E](predicate: Callable[[T], bool], error: E) -> Callable[[T], Validation[T, E]]:
-    def _rule(value: T) -> Validation[T, E]:
+    def _Rule(value: T) -> Validation[T, E]:
         return Validation.Success(value) if predicate(value) else Validation.Fail([error])
-    return _rule
+    return _Rule
 
 
 class Validation[T, E]:
-
     @staticmethod
     def Success(value: T) -> Validation[T, E]:
         return Valid(value)
@@ -30,11 +29,11 @@ class Validation[T, E]:
         return Validation.Fail([error]) if value is None else Validation.Success(value)
 
     @staticmethod
-    def Try(action: Callable[[], T], on_error: Callable[[Exception], list[E]]) -> Validation[T, E]:
+    def Try(action: Callable[[], T], onError: Callable[[Exception], list[E]]) -> Validation[T, E]:
         try:
             return Validation.Success(action())
-        except Exception as ex:
-            return Validation.Fail(on_error(ex))
+        except Exception as exception:
+            return Validation.Fail(onError(exception))
 
     @staticmethod
     def Where(rule: Callable[[T], Validation[T, E]]) -> Validator[T, E]:
@@ -55,8 +54,8 @@ class Validation[T, E]:
 
     def __iter__(self) -> Iterator[T]:
         match self:
-            case Valid(value=v):
-                yield v
+            case Valid(value=value):
+                yield value
             case Invalid():
                 return
             case _:
@@ -64,10 +63,10 @@ class Validation[T, E]:
 
     def __repr__(self) -> str:
         match self:
-            case Valid(value=v):
-                return f"Valid({v!r})"
-            case Invalid(errors=e):
-                return f"Invalid({e!r})"
+            case Valid(value=value):
+                return f"Valid({value!r})"
+            case Invalid(errors=errors):
+                return f"Invalid({errors!r})"
             case _:
                 assert_never(self)
 
@@ -75,79 +74,90 @@ class Validation[T, E]:
         if not isinstance(other, Validation):
             return NotImplemented
         match self, other:
-            case Valid(value=a), Valid(value=b):
-                return a == b
-            case Invalid(errors=a), Invalid(errors=b):
-                return a == b
+            case Valid(value=left), Valid(value=right):
+                return left == right
+            case Invalid(errors=left), Invalid(errors=right):
+                return left == right
             case _:
                 return False
 
     def __hash__(self) -> int:
         match self:
-            case Valid(value=v):
-                return hash(("Valid", v))
-            case Invalid(errors=e):
-                return hash(("Invalid", tuple(e)))
+            case Valid(value=value):
+                return hash(("Valid", value))
+            case Invalid(errors=errors):
+                return hash(("Invalid", tuple(errors)))
             case _:
                 assert_never(self)
 
-    def Match[R](self, on_ok: Callable[[T], R], on_error: Callable[[list[E]], R]) -> R:
+    def __rshift__[U](self, func: Callable[[T], Validation[U, E]]) -> Validation[U, E]:
+        return self.Bind(func)
+
+    @overload
+    def __and__[U](self, other: Validation[U, E]) -> Validation[tuple[T, U], E]: ...
+    def __and__(self, other: Any) -> Any:
+        return self.Apply(other, lambda first, second: (first, second))
+
+    def Match[R](self, onOk: Callable[[T], R], onError: Callable[[list[E]], R]) -> R:
         match self:
-            case Valid(value=v):
-                return on_ok(v)
-            case Invalid(errors=e):
-                return on_error(e)
+            case Valid(value=value):
+                return onOk(value)
+            case Invalid(errors=errors):
+                return onError(errors)
             case _:
                 assert_never(self)
 
     def Map[U](self, func: Callable[[T], U]) -> Validation[U, E]:
-        return self.Match(lambda v: Valid(func(v)), Invalid)
+        return self.Match(lambda value: Valid(func(value)), Invalid)
 
     def MapErrors[E2](self, func: Callable[[E], E2]) -> Validation[T, E2]:
-        return self.Match(Valid, lambda errors: Invalid([func(e) for e in errors]))
+        return self.Match(Valid, lambda errors: Invalid([func(error) for error in errors]))
+
+    def Bind[U](self, func: Callable[[T], Validation[U, E]]) -> Validation[U, E]:
+        return self.Match(func, Invalid)
 
     def Then[U](self, func: Callable[[T], Validation[U, E]]) -> Validation[U, E]:
-        return self.Match(func, Invalid)
+        return self.Bind(func)
 
     def Catch[E2](self, func: Callable[[list[E]], Validation[T, E2]]) -> Validation[T, E2]:
         return self.Match(Valid, func)
 
     def Apply[U, R](self, other: Validation[U, E], combiner: Callable[[T, U], R]) -> Validation[R, E]:
         match self, other:
-            case Valid(value=a), Valid(value=b):
-                return Valid(combiner(a, b))
-            case Invalid(errors=a), Invalid(errors=b):
-                return Invalid(a + b)
-            case Invalid(errors=e), _:
-                return Invalid(e)
-            case _, Invalid(errors=e):
-                return Invalid(e)
+            case Valid(value=leftValue), Valid(value=rightValue):
+                return Valid(combiner(leftValue, rightValue))
+            case Invalid(errors=leftErrors), Invalid(errors=rightErrors):
+                return Invalid(leftErrors + rightErrors)
+            case Invalid(errors=errors), _:
+                return Invalid(errors)
+            case _, Invalid(errors=errors):
+                return Invalid(errors)
             case _:
                 assert_never(self)
+
+    def Filter(self, predicate: Callable[[T], bool], error: E) -> Validation[T, E]:
+        return self.Match(lambda value: self if predicate(value) else Validation.Fail([error]), lambda _: self)
 
     def Tap(self, action: Callable[[T], None]) -> Validation[T, E]:
-        def _on_ok(v: T) -> Validation[T, E]:
-            action(v)
+        def _OnOk(value: T) -> Validation[T, E]:
+            action(value)
             return self
-        return self.Match(_on_ok, lambda _: self)
+        return self.Match(_OnOk, lambda _: self)
 
     def TapErrors(self, action: Callable[[list[E]], None]) -> Validation[T, E]:
-        def _on_error(errors: list[E]) -> Validation[T, E]:
+        def _OnError(errors: list[E]) -> Validation[T, E]:
             action(errors)
             return self
-        return self.Match(lambda _: self, _on_error)
+        return self.Match(lambda _: self, _OnError)
 
     def Unwrap(self) -> T:
-        match self:
-            case Valid(value=v):
-                return v
-            case Invalid(errors=e):
-                raise ValueError(f"Validation failed: {e}")
-            case _:
-                assert_never(self)
+        return self.Match(
+            lambda value: value,
+            lambda errors: (_ for _ in ()).throw(ValueError(f"Validation failed: {errors}"))
+        )
 
     def GetOrElse(self, fallback: Callable[[list[E]], T]) -> T:
-        return self.Match(lambda v: v, fallback)
+        return self.Match(lambda value: value, fallback)
 
     def GetOr(self, default: T) -> T:
         return self.GetOrElse(lambda _: default)
@@ -158,13 +168,13 @@ class Validation[T, E]:
                 return self
             case Invalid(), Valid():
                 return other
-            case Invalid(errors=a), Invalid(errors=b):
-                return Invalid(a + b)
+            case Invalid(errors=leftErrors), Invalid(errors=rightErrors):
+                return Invalid(leftErrors + rightErrors)
             case _:
                 assert_never(self)
 
     def Flatten(self: Validation[Validation[T, E], E]) -> Validation[T, E]:
-        return self.Then(lambda inner: inner)
+        return self.Bind(lambda inner: inner)
 
     def Exists(self, predicate: Callable[[T], bool]) -> bool:
         return self.Match(predicate, lambda _: False)
@@ -172,50 +182,70 @@ class Validation[T, E]:
     def ForAll(self, predicate: Callable[[T], bool]) -> bool:
         return self.Match(predicate, lambda _: True)
 
+    def Contains(self, value: T) -> bool:
+        return self.Exists(lambda current: current == value)
+
+    def Count(self) -> int:
+        return self.Match(lambda _: 1, lambda _: 0)
+
+    def Fold[S](self, state: S, folder: Callable[[S, T], S]) -> S:
+        return self.Match(lambda value: folder(state, value), lambda _: state)
+
+    def BiFold[S](self, state: S, okFolder: Callable[[S, T], S], errorFolder: Callable[[S, list[E]], S]) -> S:
+        return self.Match(lambda value: okFolder(state, value), lambda errors: errorFolder(state, errors))
+
+    def MapN[R](self, func: Callable[..., R]) -> Validation[R, E]:
+        return self.Map(lambda values: func(*values))
+
+    def Zip[U](self, other: Validation[U, E]) -> Validation[tuple[T, U], E]:
+        return self.Apply(other, lambda first, second: (first, second))
+
+    def Map2[U, R](self, other: Validation[U, E], func: Callable[[T, U], R]) -> Validation[R, E]:
+        return self.Apply(other, func)
+
+    def ToList(self) -> list[T]:
+        return self.Match(lambda value: [value], lambda _: [])
+
+    def ToNullable(self) -> T | None:
+        return self.Match(lambda value: value, lambda _: None)
+
     def ToOption(self) -> Option[T]:
         from ..option import Option
         return self.Match(Option.Some, lambda _: Option.Empty())
 
-    def ToResult(self, error_mapper: Callable[[list[E]], Exception]) -> Result[T]:
+    def ToResult(self, errorMapper: Callable[[list[E]], Exception]) -> Result[T]:
         from ..result import Result
-        return self.Match(Result.Success, lambda errors: Result.Fail(error_mapper(errors)))
+        return self.Match(Result.Success, lambda errors: Result.Fail(errorMapper(errors)))
 
-    async def MatchAsync[R](self, on_ok: Callable[[T], Awaitable[R]], on_error: Callable[[list[E]], Awaitable[R]]) -> R:
+    async def MatchAsync[R](self, onOk: Callable[[T], Awaitable[R]], onError: Callable[[list[E]], Awaitable[R]]) -> R:
         match self:
-            case Valid(value=v):
-                return await on_ok(v)
-            case Invalid(errors=e):
-                return await on_error(e)
+            case Valid(value=value):
+                return await onOk(value)
+            case Invalid(errors=errors):
+                return await onError(errors)
             case _:
                 assert_never(self)
 
     async def MapAsync[U](self, func: Callable[[T], Awaitable[U]]) -> Validation[U, E]:
         match self:
-            case Valid(value=v):
-                return Valid(await func(v))
+            case Valid(value=value):
+                return Valid(await func(value))
             case Invalid():
                 return self
             case _:
                 assert_never(self)
 
-    async def ThenAsync[U](self, func: Callable[[T], Awaitable[Validation[U, E]]]) -> Validation[U, E]:
+    async def BindAsync[U](self, func: Callable[[T], Awaitable[Validation[U, E]]]) -> Validation[U, E]:
         match self:
-            case Valid(value=v):
-                return await func(v)
+            case Valid(value=value):
+                return await func(value)
             case Invalid():
                 return self
             case _:
                 assert_never(self)
-
-    @overload
-    def __and__[U](self, other: Validation[U, E]) -> Validation[tuple[T, U], E]: ...
-
-    def __and__(self, other: Any) -> Any:
-        return self.Apply(other, lambda a, b: (a, b))
 
 
 class Validator[T, E]:
-
     def __init__(self, func: Callable[[T], Validation[T, E]]) -> None:
         self._func = func
 
@@ -223,39 +253,38 @@ class Validator[T, E]:
         return self._func(value)
 
     def And(self, rule: Callable[[T], Validation[T, E]]) -> Validator[T, E]:
-        def _combined(value: T) -> Validation[T, E]:
-            r1 = self._func(value)
-            r2 = rule(value)
-            match r1, r2:
+        def _Combined(value: T) -> Validation[T, E]:
+            firstResult = self._func(value)
+            secondResult = rule(value)
+            match firstResult, secondResult:
                 case Valid(), Valid():
-                    return r1
-                case Invalid(errors=e1), Invalid(errors=e2):
-                    return Invalid(e1 + e2)
+                    return firstResult
+                case Invalid(errors=firstErrors), Invalid(errors=secondErrors):
+                    return Invalid(firstErrors + secondErrors)
                 case Invalid(), _:
-                    return r1
+                    return firstResult
                 case _, Invalid():
-                    return r2
+                    return secondResult
                 case _:
-                    assert_never(r1)
-        return Validator(_combined)
+                    assert_never(firstResult)
+        return Validator(_Combined)
 
     def Then[U](self, transform: Callable[[T], Validation[U, E]]) -> Validator[U, E]:
-        def _combined(value: T) -> Validation[U, E]:
-            r1 = self._func(value)
-            match r1:
-                case Valid(value=v):
-                    return transform(v)
+        def _Combined(value: T) -> Validation[U, E]:
+            firstResult = self._func(value)
+            match firstResult:
+                case Valid(value=validValue):
+                    return transform(validValue)
                 case Invalid():
-                    return r1
+                    return firstResult
                 case _:
-                    assert_never(r1)
-        return Validator(_combined)
+                    assert_never(firstResult)
+        return Validator(_Combined)
 
 
 @dataclass(frozen=True, slots=True, repr=False)
 class Valid[T, E](Validation[T, E]):
     value: T
-
 
 @dataclass(frozen=True, slots=True, repr=False)
 class Invalid[E](Validation[Never, E]):
