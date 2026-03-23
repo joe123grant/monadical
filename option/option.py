@@ -83,16 +83,16 @@ class Option[T]:
                 assert_never(self)
 
     def Map[U](self, func: Callable[[T], U]) -> Option[U]:
-        return self.Match(lambda v: Some(func(v)), Option.Empty)
+        return self.Match(lambda value: Some(func(value)), Option.Empty)
 
     def BiMap[U](self, onSome: Callable[[T], U], onEmpty: Callable[[], U]) -> Option[U]:
-        return self.Match(lambda v: Some(onSome(v)), lambda: Some(onEmpty()))
+        return self.Match(lambda value: Some(onSome(value)), lambda: Some(onEmpty()))
 
     def Bind[U](self, func: Callable[[T], Option[U]]) -> Option[U]:
         return self.Match(func, Option.Empty)
 
     def Filter(self, predicate: Callable[[T], bool]) -> Option[T]:
-        return self.Match(lambda v: Some(v) if predicate(v) else Option.Empty(), Option.Empty)
+        return self.Match(lambda value: Some(value) if predicate(value) else Option.Empty(), Option.Empty)
 
     @staticmethod
     def FromNullable(value: T | None) -> Option[T]:
@@ -103,11 +103,11 @@ class Option[T]:
         if value is None:
             return Option.Empty()
 
-        s = value.strip() if strip else value
-        return Option.Empty() if s == "" else Some(s)
+        stripped = value.strip() if strip else value
+        return Option.Empty() if stripped == "" else Some(stripped)
 
     @staticmethod
-    def FromDict(data: dict, key: Any) -> Option[Any]:
+    def FromDict[K, V](data: dict[K, V], key: K) -> Option[V]:
         return Option.FromNullable(data.get(key))
 
     @staticmethod
@@ -119,20 +119,20 @@ class Option[T]:
         return Some(valueFactory()) if predicate else Option.Empty()
 
     @staticmethod
-    def Try(func: Callable[[], T], exceptions: type[BaseException] | tuple[type[BaseException], ...] = Exception) -> Option[T]:
+    def Try(action: Callable[[], T], exceptions: type[BaseException] | tuple[type[BaseException], ...] = Exception) -> Option[T]:
         try:
-            return Some(func())
+            return Some(action())
         except exceptions:
             return Option.Empty()
 
     def IfEmpty(self, fallback: Callable[[], T]) -> T:
-        return self.Match(lambda v: v, fallback)
+        return self.Match(lambda value: value, fallback)
 
     def IfEmptyValue(self, fallbackValue: T) -> T:
         return self.IfEmpty(lambda: fallbackValue)
 
     def Unwrap(self) -> T:
-        return self.Match(lambda v: v, lambda: (_raise(ValueError("Option is Empty"))))
+        return self.Match(lambda value: value, lambda: _raise(ValueError("Option is Empty")))
 
     def Exists(self, predicate: Callable[[T], bool]) -> bool:
         return self.Match(predicate, lambda: False)
@@ -141,44 +141,40 @@ class Option[T]:
         return self.Match(predicate, lambda: True)
 
     def Contains(self, value: T) -> bool:
-        return self.Exists(lambda v: v == value)
+        return self.Exists(lambda inner: inner == value)
 
     def Count(self) -> int:
         return self.Match(lambda _: 1, lambda: 0)
 
     def Fold[S](self, state: S, folder: Callable[[S, T], S]) -> S:
-        return self.Match(lambda v: folder(state, v), lambda: state)
+        return self.Match(lambda value: folder(state, value), lambda: state)
 
     def BiFold[S](self, state: S, someFolder: Callable[[S, T], S], emptyFolder: Callable[[S], S]) -> S:
-        return self.Match(lambda v: someFolder(state, v), lambda: emptyFolder(state))
+        return self.Match(lambda value: someFolder(state, value), lambda: emptyFolder(state))
 
     def Tap(self, action: Callable[[T], None]) -> Option[T]:
-        def _onSome(v: T) -> Option[T]:
-            action(v)
+        def _onSome(value: T) -> Option[T]:
+            action(value)
             return self
         return self.Match(_onSome, lambda: self)
 
     def TapEmpty(self, action: Callable[[], None]) -> Option[T]:
-        match self:
-            case Some():
-                return self
-            case _Empty():
-                action()
-                return self
-            case _:
-                assert_never(self)
+        def _onEmpty() -> Option[T]:
+            action()
+            return self
+        return self.Match(lambda _: self, _onEmpty)
 
     def OrElse(self, fallback: Callable[[], Option[T]]) -> Option[T]:
         return self if self.IsSome() else fallback()
 
     def Zip[U](self, other: Option[U]) -> Option[tuple[T, U]]:
-        return self.Bind(lambda a: other.Map(lambda b: (a, b)))
+        return self.Bind(lambda first: other.Map(lambda second: (first, second)))
 
     def ZipN(self, *others: Option[Any]) -> Option[tuple[Any, ...]]:
         return Option.All(self, *others)
 
     def Map2[U, R](self, other: Option[U], func: Callable[[T, U], R]) -> Option[R]:
-        return self.Zip(other).Map(lambda t: func(t[0], t[1]))
+        return self.Zip(other).Map(lambda pair: func(pair[0], pair[1]))
 
     @staticmethod
     def All(*options: Option[Any]) -> Option[tuple[Any, ...]]:
@@ -199,43 +195,34 @@ class Option[T]:
         return Some(tuple(values))
 
     def MapN[R](self, func: Callable[..., R]) -> Option[R]:
-        return self.Map(lambda t: func(*t))
+        return self.Map(lambda values: func(*values))
 
     def Flatten(self: Option[Option[T]]) -> Option[T]:
         return self.Bind(lambda inner: inner)
 
     def ToList(self) -> list[T]:
-        return self.Match(lambda v: [v], lambda: [])
+        return self.Match(lambda value: [value], lambda: [])
 
     def ToNullable(self) -> T | None:
-        return self.Match(lambda v: v, lambda: None)
+        return self.Match(lambda value: value, lambda: None)
 
     async def MatchAsync[R](self, onSome: Callable[[T], Awaitable[R]], onEmpty: Callable[[], Awaitable[R]]) -> R:
-        match self:
-            case Some(value=v):
-                return await onSome(v)
-            case _Empty():
-                return await onEmpty()
-            case _:
-                assert_never(self)
-
-    async def MapAsync[U](self, func: Callable[[T], Awaitable[U]]) -> Option[U]:
-        match self:
-            case Some(value=v):
-                return Some(await func(v))
-            case _Empty():
-                return Option.Empty()
-            case _:
-                assert_never(self)
-
-    async def BindAsync[U](self, func: Callable[[T], Awaitable[Option[U]]]) -> Option[U]:
-        match self:
-            case Some(value=v):
-                return await func(v)
-            case _Empty():
-                return Option.Empty()
-            case _:
-                assert_never(self)
+        return await self.Match(onSome, onEmpty)
+    
+    async def MapAsync[U](self, action: Callable[[T], Awaitable[U]]) -> Option[U]:
+        async def _someAsync(value: T) -> Option[U]:
+            return Some(await action(value))
+    
+        async def _emptyAsync() -> Option[U]:
+            return Option.Empty()
+    
+        return await self.MatchAsync(_someAsync, _emptyAsync)
+    
+    async def BindAsync[U](self, action: Callable[[T], Awaitable[Option[U]]]) -> Option[U]:
+        async def _emptyAsync() -> Option[U]:
+            return Option.Empty()
+    
+        return await self.MatchAsync(action, _emptyAsync)
 
 def _raise(exc: BaseException) -> Never:
     raise exc
