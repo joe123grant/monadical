@@ -224,7 +224,7 @@ asList   = option.ToList()       # [] or [value]
 ```python
 result = (
     Option.FromDict(cache, key)
-    .Tap(lambda v: logger.debug(f"Cache hit: {v}"))
+    .Tap(lambda value: logger.debug(f"Cache hit: {value}"))
     .TapEmpty(lambda: logger.debug("Cache miss"))
     >> ComputeValue
 )
@@ -239,13 +239,13 @@ from option import Sequence, Traverse, Choose, Somes, Partition
 pair = nameOption.Zip(ageOption)   # Option[tuple[str, int]]
 
 # Combine N options — Empty if any is Empty
-all3 = Option.All(opt1, opt2, opt3)   # Option[tuple[T1, T2, T3]]
+all3 = Option.All(option1, option2, option3)   # Option[tuple[T1, T2, T3]]
 
 # Map2: combine two options with a function
-fullName = firstOption.Map2(lastOption, lambda f, l: f"{f} {l}")
+fullName = firstOption.Map2(lastOption, lambda first, last: f"{first} {last}")
 
 # Sequence a list — Empty if any element is Empty
-maybeAll = Sequence([opt1, opt2, opt3])   # Option[list[T]]
+maybeAll = Sequence([option1, option2, option3])   # Option[list[T]]
 
 # Traverse: map and sequence
 maybeInts = Traverse(rawStrings, ParseInt)   # Option[list[int]]
@@ -254,10 +254,10 @@ maybeInts = Traverse(rawStrings, ParseInt)   # Option[list[int]]
 validInts = Choose(rawStrings, ParseInt)     # list[int]
 
 # Somes: extract values, discarding Empty
-values = Somes([opt1, opt2, opt3])           # list[T]
+values = Somes([option1, option2, option3])           # list[T]
 
 # Partition: split into values and count of Empty
-values, emptyCount = Partition([opt1, opt2, opt3])
+values, emptyCount = Partition([option1, option2, option3])
 ```
 
 ### Parsing utilities
@@ -287,11 +287,11 @@ jsonData   = AsFile(rawPath) >> ReadJson                    # Option[Any]
 ### Boolean query methods
 
 ```python
-option.IsSome()                         # True if value is present
-option.IsEmpty()                        # True if absent
-option.Exists(lambda v: v > 10)         # True if Some and predicate holds
-option.ForAll(lambda v: v > 10)         # True if Empty or predicate holds
-option.Contains(42)                     # True if Some(42)
+option.IsSome()                              # True if value is present
+option.IsEmpty()                             # True if absent
+option.Exists(lambda value: value > 10)      # True if Some and predicate holds
+option.ForAll(lambda value: value > 10)      # True if Empty or predicate holds
+option.Contains(42)                          # True if Some(42)
 ```
 
 ### Complete example — user profile lookup
@@ -344,7 +344,7 @@ userResult = Result.SuccessNonNull(db.FindById(userId))
 # Capture a call that might raise
 parsed     = Result.Try(
     lambda: int(rawInput),
-    lambda e: ValueError(f"Cannot parse age: {e}"),
+    lambda exception: ValueError(f"Cannot parse age: {exception}"),
 )
 
 # Combine multiple Results — fails on first Failure
@@ -359,7 +359,7 @@ def FetchUser(uid: UUID) -> Result[User]: ...
 def AuthoriseAccess(user: User) -> Result[User]: ...
 
 authorisedUser = (
-    Result.Try(lambda: raw.strip(), lambda e: ValueError(str(e)))
+    Result.Try(lambda: raw.strip(), lambda exception: ValueError(str(exception)))
     >> ParseUserId
     >> FetchUser
     >> AuthoriseAccess
@@ -397,14 +397,14 @@ doubled = ageResult.Map(lambda age: age * 2)
 profile = ageResult >> LookupProfile
 
 # MapError: transform the error type
-mapped = result.MapError(lambda e: AppError(str(e)))
+mapped = result.MapError(lambda error: AppError(str(error)))
 ```
 
 ### Recovery
 
 ```python
 # Recover with a function of the error
-value = result.Recover(lambda e: DEFAULT_VALUE)
+value = result.Recover(lambda error: DEFAULT_VALUE)
 
 # Recover with a static value
 value = result.RecoverValue(DEFAULT_VALUE)
@@ -418,7 +418,7 @@ value = result.OrElse(lambda: FetchFromFallback())
 ```python
 response = authorisedUser.Match(
     onSuccess = lambda user: JsonResponse(user.ToDict()),
-    onFailure = lambda err:  ErrorResponse(str(err)),
+    onFailure = lambda error: ErrorResponse(str(error)),
 )
 ```
 
@@ -427,14 +427,14 @@ response = authorisedUser.Match(
 ```python
 # Safe — provide error fallback
 age   = ageResult.IfFailValue(0)
-age   = ageResult.IfFail(lambda e: ComputeDefault(e))
+age   = ageResult.IfFail(lambda error: ComputeDefault(error))
 
 # Unsafe — raises the wrapped exception; use only at program boundaries
 value = result.Unwrap() if result.IsSuccess() else None
 
 # Convert
-opt   = result.ToNullable()   # T | None
-lst   = result.ToList()       # [] or [value]
+nullable = result.ToNullable()   # T | None
+asList   = result.ToList()       # [] or [value]
 ```
 
 ### Side effects
@@ -443,7 +443,7 @@ lst   = result.ToList()       # [] or [value]
 processed = (
     FetchData(url)
     .Tap(lambda data: logger.info(f"Fetched {len(data)} bytes"))
-    .TapFail(lambda e: logger.error(f"Fetch failed: {e}"))
+    .TapFail(lambda error: logger.error(f"Fetch failed: {error}"))
     >> ParseJson
     >> ValidateSchema
 )
@@ -455,9 +455,9 @@ processed = (
 from result import FromStatusCode, HttpError
 
 def CallApi(endpoint: str) -> Result[dict]:
-    resp = requests.get(endpoint)
+    response = requests.get(endpoint)
     return (
-        FromStatusCode(resp.status_code, resp.json(), resp.reason)
+        FromStatusCode(response.status_code, response.json(), response.reason)
         >> ParseBody
     )
 ```
@@ -480,29 +480,29 @@ startDate  = ParseDate(rawDate)                 # Result[date]
 from result import Sequence, Traverse, Partition, Choose, Oks
 
 # Sequence — fails on first failure
-allResults = Sequence([res1, res2, res3])    # Result[list[T]]
+allResults = Sequence([result1, result2, result3])    # Result[list[T]]
 
 # Traverse — map then sequence
 parsedInts = Traverse(rawStrings, ParseInt)  # Result[list[int]]
 
 # Partition — separate successes from failures
-values, errors = Partition([res1, res2, res3])
+values, errors = Partition([result1, result2, result3])
 
 # Choose — keep only successes
 validValues = Choose(rawStrings, ParseInt)   # list[int]
 
 # Oks — extract successes, ignore failures
-values = Oks([res1, res2, res3])             # list[T]
+values = Oks([result1, result2, result3])             # list[T]
 ```
 
 ### Boolean queries
 
 ```python
-result.IsSuccess()                      # True if Ok
-result.IsFailure()                      # True if Failure
-result.Exists(lambda v: v > 0)          # True if Ok and predicate holds
-result.ForAll(lambda v: v > 0)          # True if Failure or predicate holds
-result.Contains(42)                     # True if Ok(42)
+result.IsSuccess()                              # True if Ok
+result.IsFailure()                              # True if Failure
+result.Exists(lambda value: value > 0)          # True if Ok and predicate holds
+result.ForAll(lambda value: value > 0)          # True if Failure or predicate holds
+result.Contains(42)                             # True if Ok(42)
 ```
 
 ### Complete example — API request pipeline
@@ -516,18 +516,18 @@ def FetchConfig(environment: str) -> Result[AppConfig]:
         RequireEnv("CONFIG_URL")
         >> (lambda baseUrl: Result.Try(
             lambda: requests.get(f"{baseUrl}/{environment}"),
-            lambda e: ConnectionError(f"Config fetch failed: {e}"),
+            lambda exception: ConnectionError(f"Config fetch failed: {exception}"),
         ))
-        >> (lambda resp: FromStatusCode(resp.status_code, resp.text))
+        >> (lambda response: FromStatusCode(response.status_code, response.text))
         >> ParseJson
         >> (lambda data: Result.Try(
             lambda: AppConfig(**data),
-            lambda e: ValueError(f"Invalid config shape: {e}"),
+            lambda exception: ValueError(f"Invalid config shape: {exception}"),
         ))
     )
 
 config = FetchConfig("production").IfFail(
-    lambda e: (logger.error(str(e)), DEFAULT_CONFIG)[1]
+    lambda error: (logger.error(str(error)), DEFAULT_CONFIG)[1]
 )
 ```
 
@@ -544,7 +544,7 @@ Use `Validation[T, E]` when:
 - Composing multiple independent validation rules against the same input
 - The error type `E` should be a human-readable string or a domain-specific error object
 
-`Validation` is **not** a drop-in for `Result`. It uses applicative composition (`&`, `Apply`) rather than monadic bind when you want error accumulation. Use `Then` only when later validations depend on earlier ones (which will short-circuit).
+`Validation` is **not** a drop-in for `Result`. It uses applicative composition (`&`, `Apply`) rather than monadic bind when you want error accumulation. Use `Bind` / `Then` only when later validations depend on earlier ones (which will short-circuit).
 
 ### Constructors
 
@@ -563,7 +563,7 @@ nameResult  = Validation.Require(user.name, "Name is required")
 # Capture a throwing call, map exception to error list
 parsed      = Validation.Try(
     lambda: int(rawAge),
-    lambda e: [f"Age must be a number, got: {rawAge}"],
+    lambda exception: [f"Age must be a number, got: {rawAge}"],
 )
 ```
 
@@ -594,15 +594,21 @@ userResult = (
 ).MapN(lambda name, email, age: User(name=name, email=email, age=age))
 ```
 
-### Monadic bind with `Then`
+### Monadic bind with `Bind` / `Then`
 
-`Then` short-circuits like `Result`. Use it when a later validation **depends on** an earlier result.
+`Bind` (and its alias `Then`) short-circuits like `Result`. Use it when a later validation **depends on** an earlier result. The `>>` operator also maps to `Bind`.
 
 ```python
 # Parse first, then validate the parsed value
 ageValidation = (
-    Validation.Try(lambda: int(rawAge), lambda e: ["Age must be a number"])
-    .Then(lambda age: Validation.Success(age) if age >= 0 else Validation.Fail(["Age must be non-negative"]))
+    Validation.Try(lambda: int(rawAge), lambda exception: ["Age must be a number"])
+    .Bind(lambda age: Validation.Success(age) if age >= 0 else Validation.Fail(["Age must be non-negative"]))
+)
+
+# Or using the >> operator
+ageValidation = (
+    Validation.Try(lambda: int(rawAge), lambda exception: ["Age must be a number"])
+    >> (lambda age: Validation.Success(age) if age >= 0 else Validation.Fail(["Age must be non-negative"]))
 )
 ```
 
@@ -612,8 +618,8 @@ ageValidation = (
 from validation import Validation, Rule
 
 # Rule: predicate -> error -> validator function
-IsNonEmpty  = Rule(lambda s: bool(s.strip()), "Must not be blank")
-IsShortEnough = Rule(lambda s: len(s) <= 100, "Must be 100 characters or fewer")
+IsNonEmpty  = Rule(lambda text: bool(text.strip()), "Must not be blank")
+IsShortEnough = Rule(lambda text: len(text) <= 100, "Must be 100 characters or fewer")
 
 # Validator: composable chain of rules
 from validation import Validation
@@ -633,8 +639,8 @@ nameResult = NameValidator(rawName)   # Validation[str, str]
 
 ```python
 output = userValidation.Match(
-    on_ok    = lambda user: f"Created user {user.name}",
-    on_error = lambda errs: "Errors:\n" + "\n".join(f"  • {e}" for e in errs),
+    onOk    = lambda user: f"Created user {user.name}",
+    onError = lambda errors: "Errors:\n" + "\n".join(f"  • {error}" for error in errors),
 )
 ```
 
@@ -656,8 +662,8 @@ user = validated.Unwrap()
 ```python
 processed = (
     ValidateRequest(payload)
-    .Tap(lambda req: auditLog.Record(req))
-    .TapErrors(lambda errs: logger.warning(f"Validation failed: {errs}"))
+    .Tap(lambda request: auditLog.Record(request))
+    .TapErrors(lambda errors: logger.warning(f"Validation failed: {errors}"))
 )
 ```
 
@@ -679,13 +685,13 @@ resultUser = validated.ToResult(
 from validation import Sequence, Traverse, Partition, Choose
 
 # Validate each item; accumulate ALL errors across ALL items
-allValid = Sequence([ValidateItem(x) for x in items])
+allValid = Sequence([ValidateItem(item) for item in items])
 
 # Traverse: map + sequence
 allValid = Traverse(items, ValidateItem)   # Validation[list[T], E]
 
 # Partition: separate valid values from all collected errors
-values, allErrors = Partition([ValidateItem(x) for x in items])
+values, allErrors = Partition([ValidateItem(item) for item in items])
 
 # Choose: keep only valid values, silently drop invalid
 validItems = Choose(items, ValidateItem)   # list[T]
@@ -694,10 +700,11 @@ validItems = Choose(items, ValidateItem)   # list[T]
 ### Boolean queries
 
 ```python
-v.IsOk()                            # True if Valid
-v.HasErrors()                       # True if Invalid
-v.Exists(lambda x: x > 0)          # True if Valid and predicate holds
-v.ForAll(lambda x: x > 0)          # True if Invalid or predicate holds
+validation.IsOk()                                  # True if Valid
+validation.HasErrors()                              # True if Invalid
+validation.Exists(lambda value: value > 0)          # True if Valid and predicate holds
+validation.ForAll(lambda value: value > 0)          # True if Invalid or predicate holds
+validation.Contains(42)                             # True if Valid(42)
 ```
 
 ### Complete example — form validation
@@ -705,10 +712,10 @@ v.ForAll(lambda x: x > 0)          # True if Invalid or predicate holds
 ```python
 from validation import Validation, Rule, ParseInt, ValidateEnv
 
-IsNonEmpty     = Rule(lambda s: bool(s and s.strip()),      "Must not be blank")
-IsValidEmail   = Rule(lambda s: "@" in s and "." in s,      "Must be a valid email")
-IsAdult        = Rule(lambda n: n >= 18,                    "Must be 18 or older")
-IsReasonableAge = Rule(lambda n: n <= 120,                  "Unrealistic age")
+IsNonEmpty      = Rule(lambda text: bool(text and text.strip()),      "Must not be blank")
+IsValidEmail    = Rule(lambda text: "@" in text and "." in text,      "Must be a valid email")
+IsAdult         = Rule(lambda age: age >= 18,                         "Must be 18 or older")
+IsReasonableAge = Rule(lambda age: age <= 120,                        "Unrealistic age")
 
 def ValidateName(raw: str) -> Validation[str, str]:
     return Validation.Where(IsNonEmpty)(raw)
@@ -722,7 +729,7 @@ def ValidateEmail(raw: str) -> Validation[str, str]:
 def ValidateAge(raw: str) -> Validation[int, str]:
     return (
         ParseInt(raw)
-        .Then(lambda age: (
+        .Bind(lambda age: (
             Validation.Where(IsAdult)
             .And(IsReasonableAge)
         )(age))
@@ -776,15 +783,15 @@ getState = State.Get()                  # State[S, S]
 setState = State.Put(newState)          # State[S, None]
 
 # Modify state with a function
-increment = State.Modify(lambda s: s + 1)   # State[int, None]
+increment = State.Modify(lambda state: state + 1)   # State[int, None]
 
 # Extract a value from state without changing it
-getName = State.Gets(lambda s: s.name)  # State[Config, str]
+getName = State.Gets(lambda state: state.name)  # State[Config, str]
 
 # Conditionally execute a stateful action
 conditionalIncrement = State.When(
-    lambda s: s < 10,
-    State.Modify(lambda s: s + 1),
+    lambda state: state < 10,
+    State.Modify(lambda state: state + 1),
 )
 ```
 
@@ -806,7 +813,7 @@ value, finalState = counter.Run(0)   # value=1, finalState=1
 
 ```python
 # Map: transform the value, state is unaffected
-doubled = State.Gets(lambda s: s.count).Map(lambda n: n * 2)
+doubled = State.Gets(lambda state: state.count).Map(lambda count: count * 2)
 
 # Bind (>>): value flows into the next stateful function
 pipeline = State.Get() >> ComputeNext >> ApplyToState
@@ -847,7 +854,7 @@ def IncrementCounter(state: State[int, None]) -> State[AppState, None]:
         ),
     )
 
-fullPipeline = IncrementCounter(State.Modify(lambda n: n + 1))
+fullPipeline = IncrementCounter(State.Modify(lambda counter: counter + 1))
 ```
 
 ### Local — temporarily modified state
@@ -856,7 +863,7 @@ fullPipeline = IncrementCounter(State.Modify(lambda n: n + 1))
 
 ```python
 # Run computation in a context with logging enabled, restore afterwards
-withLogging = computeResult.Local(lambda s: Config(s, debug=True))
+withLogging = computeResult.Local(lambda state: Config(state, debug=True))
 ```
 
 ### Tap — side effects without changing state or value
@@ -864,8 +871,8 @@ withLogging = computeResult.Local(lambda s: Config(s, debug=True))
 ```python
 withLogging = (
     State.Get()
-    .TapState(lambda s: logger.debug(f"State: {s}"))
-    .Tap(lambda v: logger.debug(f"Value: {v}"))
+    .TapState(lambda state: logger.debug(f"State: {state}"))
+    .Tap(lambda value: logger.debug(f"Value: {value}"))
     >> ProcessValue
 )
 ```
@@ -882,7 +889,7 @@ allValues = Sequence([step1, step2, step3])    # State[S, list[A]]
 allResults = Traverse(items, ProcessItem)      # State[S, list[B]]
 
 # Run the same computation N times, collect results
-history = Replicate(5, State.Modify(lambda s: s + 1).Then(State.Get()))
+history = Replicate(5, State.Modify(lambda state: state + 1).Then(State.Get()))
 ```
 
 ### Complete example — config builder
@@ -898,13 +905,13 @@ class Config(NamedTuple):
     timeout: int  = 30
 
 def SetHost(host: str) -> State[Config, None]:
-    return State.Modify(lambda cfg: cfg._replace(host=host))
+    return State.Modify(lambda config: config._replace(host=host))
 
 def SetPort(port: int) -> State[Config, None]:
-    return State.Modify(lambda cfg: cfg._replace(port=port))
+    return State.Modify(lambda config: config._replace(port=port))
 
 def EnableDebug() -> State[Config, None]:
-    return State.Modify(lambda cfg: cfg._replace(debug=True))
+    return State.Modify(lambda config: config._replace(debug=True))
 
 def BuildConfig(overrides: dict) -> Config:
     pipeline = (
@@ -921,8 +928,8 @@ def BuildConfig(overrides: dict) -> Config:
 ```python
 from state import State
 
-AddOne    = State.Modify(lambda n: n + 1)
-ResetWhen = lambda limit: State.When(lambda n: n >= limit, State.Put(0))
+AddOne    = State.Modify(lambda count: count + 1)
+ResetWhen = lambda limit: State.When(lambda count: count >= limit, State.Put(0))
 
 counter = (
     AddOne
@@ -941,12 +948,13 @@ for tick in range(25):
 
 ### `>>` — Bind (all monads)
 
-Threads the unwrapped value into the next function. Short-circuits on `Empty` / `Failure`.
+Threads the unwrapped value into the next function. Short-circuits on `Empty` / `Failure` / `Invalid`.
 
 ```python
-option >> funcReturningOption    # Option[U]
-result >> funcReturningResult    # Result[U]
-state  >> funcReturningState     # State[S, B]
+option     >> funcReturningOption        # Option[U]
+result     >> funcReturningResult        # Result[U]
+validation >> funcReturningValidation    # Validation[U, E]
+state      >> funcReturningState         # State[S, B]
 ```
 
 The function on the right **must** return the same monad type.
@@ -968,11 +976,11 @@ Use a lambda on the right side whenever the fallback is expensive or has side ef
 
 ```python
 # Both sides always evaluated; errors from both accumulated
-v1 & v2     # Validation[tuple[T1, T2], E]
-v1 & v2 & v3  # Validation[tuple[tuple[T1, T2], T3], E]
+validation1 & validation2       # Validation[tuple[T1, T2], E]
+validation1 & validation2 & validation3  # Validation[tuple[tuple[T1, T2], T3], E]
 ```
 
-Use `.MapN(lambda a, b, c: ...)` after `&` chains to unpack the nested tuple into a clean object.
+Use `.MapN(lambda first, second, third: ...)` after `&` chains to unpack the nested tuple into a clean object.
 
 ### Operator chaining idioms
 
@@ -995,10 +1003,10 @@ data = (
 
 # Validation: accumulate all field errors
 validated = (
-    ValidateField1(data["f1"])
-    & ValidateField2(data["f2"])
-    & ValidateField3(data["f3"])
-).MapN(lambda f1, f2, f3: DomainObject(f1, f2, f3))
+    ValidateField1(data["field1"])
+    & ValidateField2(data["field2"])
+    & ValidateField3(data["field3"])
+).MapN(lambda field1, field2, field3: DomainObject(field1, field2, field3))
 
 # State: thread state through multiple steps
 finalState = (
@@ -1024,13 +1032,13 @@ from validation import Sequence as ValidationSequence
 from state      import Sequence as StateSequence
 
 # Option: Empty if any element is Empty
-maybeAll = OptionSequence([opt1, opt2, opt3])
+maybeAll = OptionSequence([option1, option2, option3])
 
 # Result: fails on the first Failure
-allResults = ResultSequence([res1, res2, res3])
+allResults = ResultSequence([result1, result2, result3])
 
 # Validation: accumulates ALL errors
-allValidated = ValidationSequence([val1, val2, val3])
+allValidated = ValidationSequence([validation1, validation2, validation3])
 
 # State: runs all in sequence, collects values
 allStates = StateSequence([state1, state2, state3])
@@ -1071,13 +1079,13 @@ from result     import Partition as ResultPartition
 from validation import Partition as ValidationPartition
 
 # Option
-values, emptyCount = OptionPartition([opt1, opt2, opt3])
+values, emptyCount = OptionPartition([option1, option2, option3])
 
 # Result
-values, errors = ResultPartition([res1, res2, res3])
+values, errors = ResultPartition([result1, result2, result3])
 
 # Validation
-values, allErrors = ValidationPartition([val1, val2, val3])
+values, allErrors = ValidationPartition([validation1, validation2, validation3])
 # allErrors is a flat list of ALL errors from ALL invalid items
 ```
 
@@ -1088,9 +1096,9 @@ from option     import Somes
 from result     import Oks
 from validation import Valids
 
-presentValues = Somes([opt1, opt2, opt3])   # list[T]
-successValues = Oks([res1, res2, res3])     # list[T]
-validValues   = Valids([val1, val2, val3])  # list[T]
+presentValues = Somes([option1, option2, option3])          # list[T]
+successValues = Oks([result1, result2, result3])            # list[T]
+validValues   = Valids([validation1, validation2, validation3])  # list[T]
 ```
 
 ---
@@ -1266,17 +1274,17 @@ def GetUserResponse(rawId: str | None) -> HttpResponse:
 ```python
 from validation import Validation, Rule, ParseInt
 
-IsPresent   = Rule(lambda s: bool(s and s.strip()), "is required")
-IsEmail     = Rule(lambda s: "@" in s,              "must be a valid email address")
-IsAdult     = Rule(lambda n: n >= 18,               "must be at least 18")
+IsPresent   = Rule(lambda text: bool(text and text.strip()), "is required")
+IsEmail     = Rule(lambda text: "@" in text,                 "must be a valid email address")
+IsAdult     = Rule(lambda age: age >= 18,                    "must be at least 18")
 
 def ValidateSignup(form: dict) -> Validation[NewUser, str]:
-    nameV  = Validation.Where(IsPresent)(form.get("name", ""))
-    emailV = (Validation.Where(IsPresent).And(IsEmail))(form.get("email", ""))
-    ageV   = ParseInt(form.get("age", "")).Then(
+    nameValidation  = Validation.Where(IsPresent)(form.get("name", ""))
+    emailValidation = (Validation.Where(IsPresent).And(IsEmail))(form.get("email", ""))
+    ageValidation   = ParseInt(form.get("age", "")).Bind(
         lambda age: Validation.Where(IsAdult)(age)
     )
-    return (nameV & emailV & ageV).MapN(
+    return (nameValidation & emailValidation & ageValidation).MapN(
         lambda name, email, age: NewUser(name=name, email=email, age=age)
     )
 ```
@@ -1303,10 +1311,10 @@ from state import State
 from os import environ
 
 def LoadConfig() -> AppConfig:
-    def ApplyEnvOverrides(cfg: AppConfig) -> AppConfig:
-        return cfg._replace(
-            host  = environ.get("HOST",  cfg.host),
-            port  = int(environ.get("PORT", cfg.port)),
+    def ApplyEnvOverrides(config: AppConfig) -> AppConfig:
+        return config._replace(
+            host  = environ.get("HOST",  config.host),
+            port  = int(environ.get("PORT", config.port)),
             debug = environ.get("DEBUG", "").lower() == "true",
         )
 
@@ -1346,7 +1354,7 @@ def GetUserHandler(rawId: str) -> HttpResponse:
     maybeUser = (
         Option.FromNullableString(rawId)
         >> ParseUuid
-        >> (lambda uid: ResultToOption(FetchUserService(uid)))
+        >> (lambda userId: ResultToOption(FetchUserService(userId)))
     )
     return maybeUser.Match(
         onSome  = lambda user: OkResponse(user),
@@ -1360,11 +1368,11 @@ def GetUserHandler(rawId: str) -> HttpResponse:
 def ProcessPayment(order: Order) -> Result[Receipt]:
     return (
         ValidateOrder(order)
-        .Tap(lambda o: metrics.Increment("orders.validated"))
-        .TapFail(lambda e: metrics.Increment("orders.validation_failed"))
+        .Tap(lambda order: metrics.Increment("orders.validated"))
+        .TapFail(lambda error: metrics.Increment("orders.validation_failed"))
         >> ChargeCard
         .Tap(lambda receipt: auditLog.Write(receipt))
-        .TapFail(lambda e: alerting.Fire(PaymentFailedAlert(order, e)))
+        .TapFail(lambda error: alerting.Fire(PaymentFailedAlert(order, error)))
         >> IssueReceipt
     )
 ```
@@ -1388,9 +1396,9 @@ def BuildDisplayName(user: User) -> str:
 from state import Replicate, State
 
 # Generate 5 unique IDs using a counter as state
-GenerateId = State.Gets(lambda n: f"item-{n:04d}").Tap(
+GenerateId = State.Gets(lambda counter: f"item-{counter:04d}").Tap(
     lambda _: None
-) >> (lambda id: State.Modify(lambda n: n + 1).Then(State.Of(id)))
+) >> (lambda identifier: State.Modify(lambda counter: counter + 1).Then(State.Of(identifier)))
 
 ids, _ = Replicate(5, GenerateId).Run(1)
 # ids = ["item-0001", "item-0002", ..., "item-0005"]
@@ -1406,7 +1414,7 @@ ids, _ = Replicate(5, GenerateId).Run(1)
 | Functions                  | PascalCase, verb-first    | `FindUser`, `ParseAge`, `ValidateEmail`, `BuildConfig`                |
 | Boolean functions          | PascalCase, question form | `IsSome`, `IsEmpty`, `HasErrors`, `IsSuccess`, `IsFailure`, `IsAdult` |
 | Variables                  | camelCase                 | `rawId`, `maybeUser`, `userResult`, `parsedAge`                       |
-| Lambdas (inline)           | camelCase parameter names | `lambda userId: ...`, `lambda err: ...`                               |
+| Lambdas (inline)           | camelCase parameter names | `lambda userId: ...`, `lambda error: ...`                             |
 | Predicates passed to rules | PascalCase                | `IsNonEmpty`, `IsValidEmail`, `IsAdult`                               |
 | No abbreviations ever      | Over all Rule             | `cxt should be context`, `lambda v: ... should be lambda value: ...`  |
 
