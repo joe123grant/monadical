@@ -1,6 +1,6 @@
 from __future__ import annotations
  
-from option.combinators import Choose, Partition, Sequence, Somes, Traverse
+from ..option.Option.combinators import Choose, Partition, Sequence, Somes, Traverse
 from option.option import Option
 from option.parse import ParseInt
  

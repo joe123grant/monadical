@@ -1,8 +1,8 @@
 from .convert import OptionToResult, ResultToOption
-from .option import Option, Some, Somes
-from .result import Result, Ok, Failure, Oks
-from .state import State, Sequence, Traverse, Replicate
-from .validation import Validation, Valid, Invalid, Valids
+from .option.option import Option, Some, Somes
+from .result.result import Result, Ok, Failure, Oks
+from .state.state import State, Sequence, Traverse, Replicate
+from .validation.validation import Validation, Valid, Invalid, Valids
 
 __all__ = [
     # converters

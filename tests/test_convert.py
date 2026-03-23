@@ -2,9 +2,9 @@ from __future__ import annotations
  
 import pytest
  
-from convert import OptionToResult, ResultToOption
-from option.option import Option, Some
-from result.result import Result, Ok, Failure
+from dscoe_func.convert import OptionToResult, ResultToOption
+from dscoe_func.option.option import Option, Some
+from dscoe_func.result.result import Result, Ok, Failure
  
 def test_option_to_result_some_returns_ok():
     result = OptionToResult(Option.Some(42), ValueError("unused"))
