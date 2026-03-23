@@ -5,20 +5,19 @@ import os
 from .validation import Validation
 from .parse import ParseBool, ParseFloat, ParseInt
 
-
 def ValidateEnv(key: str) -> Validation[str, str]:
-    val = os.environ.get(key)
-    if val is None:
+    value = os.environ.get(key)
+    if value is None:
         return Validation.Fail([f"Environment variable {key!r} is not set"])
-    if not val.strip():
+    if not value.strip():
         return Validation.Fail([f"Environment variable {key!r} is empty"])
-    return Validation.Success(val)
+    return Validation.Success(value)
 
 def ValidateEnvInt(key: str, base: int = 10) -> Validation[int, str]:
-    return ValidateEnv(key).Then(lambda v: ParseInt(v, base))
+    return ValidateEnv(key).Bind(lambda value: ParseInt(value, base))
 
 def ValidateEnvFloat(key: str) -> Validation[float, str]:
-    return ValidateEnv(key).Then(ParseFloat)
+    return ValidateEnv(key).Bind(ParseFloat)
 
 def ValidateEnvBool(key: str) -> Validation[bool, str]:
-    return ValidateEnv(key).Then(ParseBool)
+    return ValidateEnv(key).Bind(ParseBool)
