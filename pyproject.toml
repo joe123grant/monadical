@@ -16,7 +16,19 @@ dscoe_func = ["py.typed"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["src"]
 asyncio_mode = "auto"
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.ruff.lint.isort]
+combine-as-imports = true
+force-sort-within-sections = true
 
 [project.optional-dependencies]
 test = ["pytest>=8.0", "pytest-asyncio>=0.23"]

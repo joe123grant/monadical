@@ -3,7 +3,8 @@ from __future__ import annotations
 from collections.abc import Callable, Iterable
 from typing import Any
 
-from .result import Result, Ok, Failure
+from .result import Failure, Ok, Result
+
 
 def Oks(results: Iterable[Result[Any]]) -> list[Any]:
     values: list[Any] = []

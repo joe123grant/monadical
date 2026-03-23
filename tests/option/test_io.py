@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from option.io import ParseJson, ReadBytes, ReadJson, ReadLines, ReadText
+from dscoe_func.option.io import ParseJson, ReadBytes, ReadJson, ReadLines, ReadText
 
 def test_read_text_returns_file_content(text_file):
     result = ReadText(text_file)

@@ -1,8 +1,10 @@
 from __future__ import annotations
 
-from typing import Any, Callable, Iterable
+from collections.abc import Callable, Iterable
+from typing import Any
 
-from .validation import Validation, Valid, Invalid
+from .validation import Invalid, Valid, Validation
+
 
 def Valids(validations: Iterable[Validation[Any, Any]]) -> list[Any]:
     values: list[Any] = []

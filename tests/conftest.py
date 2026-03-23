@@ -1,8 +1,10 @@
 from __future__ import annotations
- 
-import pytest
+
 from enum import Enum
- 
+
+import pytest
+
+
 class Color(Enum):
     RED = 1
     GREEN = 2

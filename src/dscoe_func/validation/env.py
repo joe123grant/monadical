@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import os
 
-from .validation import Validation
 from .parse import ParseBool, ParseFloat, ParseInt
+from .validation import Validation
+
 
 def ValidateEnv(key: str) -> Validation[str, str]:
     value = os.environ.get(key)

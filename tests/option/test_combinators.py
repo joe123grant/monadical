@@ -1,9 +1,9 @@
 from __future__ import annotations
- 
-from ..option.Option.combinators import Choose, Partition, Sequence, Somes, Traverse
-from option.option import Option
-from option.parse import ParseInt
- 
+
+from dscoe_func.option.combinators import Choose, Partition, Sequence, Somes, Traverse
+from dscoe_func.option.option import Option
+from dscoe_func.option.parse import ParseInt
+
 def test_somes_returns_only_present_values():
     values = Somes([Option.Some(1), Option.Empty(), Option.Some(3)])
     assert values == [1, 3]

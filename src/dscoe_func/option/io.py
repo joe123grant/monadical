@@ -7,6 +7,7 @@ from typing import Any
 from .option import Option
 from .path import AsFile
 
+
 def ReadText(path: str | Path | None, encoding: str = "utf-8") -> Option[str]:
     return AsFile(path).Bind(lambda filePath: Option.Try(lambda: filePath.read_text(encoding=encoding)))
 

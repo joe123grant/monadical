@@ -4,6 +4,7 @@ from collections.abc import Callable, Iterable
 
 from .state import State
 
+
 def Sequence[S, A](states: Iterable[State[S, A]]) -> State[S, list[A]]:
     def _Run(initialState: S) -> tuple[list[A], S]:
         values: list[A] = []

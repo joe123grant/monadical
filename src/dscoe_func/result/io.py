@@ -4,8 +4,9 @@ import json
 from pathlib import Path
 from typing import Any
 
-from .result import Result
 from .path import RequireFile
+from .result import Result
+
 
 def ReadText(path: str | Path | None, encoding: str = "utf-8") -> Result[str]:
     return RequireFile(path).Bind(lambda filePath: Result.Try(lambda: filePath.read_text(encoding=encoding)))

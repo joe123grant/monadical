@@ -5,6 +5,7 @@ import os
 from .option import Option
 from .parse import ParseBool, ParseFloat, ParseInt
 
+
 def GetEnv(key: str) -> Option[str]:
     return Option.FromNullableString(os.environ.get(key))
 

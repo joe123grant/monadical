@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from ..option.path import AsDirectory, AsFile, AsVisibleFile
 from .validation import Validation
-from ..option.path import AsFile, AsDirectory, AsVisibleFile
+
 
 def ValidateFile(path: str | Path | None) -> Validation[Path, str]:
     return AsFile(path).Match(Validation.Success, lambda: Validation.Fail([f"Not a valid file: {path!r}"]))

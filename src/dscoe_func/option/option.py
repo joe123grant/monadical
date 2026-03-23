@@ -9,6 +9,7 @@ from typing import (
     cast,
 )
 
+
 class Option[T]:
     @staticmethod
     def Some(value: T) -> Option[T]:

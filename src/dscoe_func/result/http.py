@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from .result import Result
 
+
 class HttpError(Exception):
     def __init__(self, statusCode: int, message: str = "") -> None:
         self.statusCode = statusCode

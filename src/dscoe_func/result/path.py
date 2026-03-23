@@ -3,8 +3,9 @@ from __future__ import annotations
 import hashlib
 from pathlib import Path
 
+from ..option.path import AsDirectory, AsFile, AsVisibleFile
 from .result import Result
-from ..option.path import AsFile, AsDirectory, AsVisibleFile
+
 
 class EmptyFileError(Exception):
     pass

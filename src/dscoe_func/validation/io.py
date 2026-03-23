@@ -4,8 +4,9 @@ import json
 from pathlib import Path
 from typing import Any
 
-from .validation import Validation
 from .path import ValidateFile
+from .validation import Validation
+
 
 def ReadText(path: str | Path | None, encoding: str = "utf-8") -> Validation[str, str]:
     return ValidateFile(path).Bind(

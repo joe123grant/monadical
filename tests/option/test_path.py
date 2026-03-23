@@ -1,7 +1,8 @@
 from __future__ import annotations
- 
-from option.path import AsDirectory, AsFile, AsVisibleFile, IsDirectory, IsFile
- 
+
+from dscoe_func.option.path import AsDirectory, AsFile, AsVisibleFile, IsDirectory, IsFile
+
+
 def test_is_file_returns_some_for_existing_file(text_file):
     result = IsFile(text_file)
     assert result.IsSome()

@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import os
 
-from .result import Result
 from .parse import ParseBool, ParseFloat, ParseInt
+from .result import Result
+
 
 def RequireEnv(key: str) -> Result[str]:
     value = os.environ.get(key)

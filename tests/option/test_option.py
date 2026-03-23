@@ -1,10 +1,11 @@
 from __future__ import annotations
- 
+
 import pytest
- 
-from dscoe_func.option.option import Option, Some
+
+from dscoe_func.option.option import Option
 from dscoe_func.option.parse import ParseInt
- 
+
+
 def test_some_is_truthy_and_not_empty():
     option = Option.Some(42)
     assert option.IsSome()

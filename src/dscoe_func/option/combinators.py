@@ -5,6 +5,7 @@ from typing import Any
 
 from .option import Option, Some
 
+
 def Somes(options: Iterable[Option[Any]]) -> list[Any]:
     return [value for option in options for value in option.ToList()]
 
