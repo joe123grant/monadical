@@ -6,15 +6,15 @@ from .result import Result
 from .parse import ParseBool, ParseFloat, ParseInt
 
 def RequireEnv(key: str) -> Result[str]:
-    val = os.environ.get(key)
-    if val is None:
+    value = os.environ.get(key)
+    if value is None:
         return Result.Fail(KeyError(f"Environment variable {key!r} is not set"))
-    if not val.strip():
+    if not value.strip():
         return Result.Fail(ValueError(f"Environment variable {key!r} is empty"))
-    return Result.Success(val)
+    return Result.Success(value)
 
 def RequireEnvInt(key: str, base: int = 10) -> Result[int]:
-    return RequireEnv(key).Bind(lambda v: ParseInt(v, base))
+    return RequireEnv(key).Bind(lambda value: ParseInt(value, base))
 
 def RequireEnvFloat(key: str) -> Result[float]:
     return RequireEnv(key).Bind(ParseFloat)
