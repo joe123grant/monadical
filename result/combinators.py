@@ -1,36 +1,46 @@
 from __future__ import annotations
+
 from collections.abc import Callable, Iterable
 from typing import Any
-from .result import Result
+
+from .result import Result, Ok, Failure
 
 def Oks(results: Iterable[Result[Any]]) -> list[Any]:
-    out: list[Any] = []
-    for r in results:
-        r.Match(out.append, lambda _: None)
-    return out
+    values: list[Any] = []
+    for result in results:
+        result.Match(values.append, lambda _: None)
+    return values
 
 def Sequence(results: Iterable[Result[Any]]) -> Result[list[Any]]:
     values: list[Any] = []
-    for r in results:
-        if r.IsFailure():
-            return r
-        r.Match(values.append, lambda _: None)
+    for result in results:
+        match result:
+            case Ok(value=value):
+                values.append(value)
+            case Failure():
+                return result
+            case _:
+                return result
     return Result.Success(values)
 
 def Traverse(items: Iterable[Any], func: Callable[[Any], Result[Any]]) -> Result[list[Any]]:
     values: list[Any] = []
     for item in items:
-        r = func(item)
-        if r.IsFailure():
-            return r
-        r.Match(values.append, lambda _: None)
+        result = func(item)
+        match result:
+            case Ok(value=value):
+                values.append(value)
+            case Failure():
+                return result
+            case _:
+                return result
     return Result.Success(values)
 
 def Partition(results: Iterable[Result[Any]]) -> tuple[list[Any], list[Exception]]:
     values: list[Any] = []
     errors: list[Exception] = []
-    for r in results:
-        r.Match(values.append, errors.append)
+    for result in results:
+        result.Match(values.append, errors.append)
     return values, errors
 
 def Choose(items: Iterable[Any], func: Callable[[Any], Result[Any]]) -> list[Any]:
