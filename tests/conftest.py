@@ -17,7 +17,7 @@ def sample_enum():
 @pytest.fixture
 def text_file(tmp_path):
     filePath = tmp_path / "hello.txt"
-    filePath.write_text("hello\nworld\n")
+    filePath.write_bytes(b"hello\nworld\n")
     return filePath
  
 @pytest.fixture
@@ -38,6 +38,12 @@ def hidden_file(tmp_path):
     filePath.write_text("secret")
     return filePath
  
+@pytest.fixture
+def invalid_json_file(tmp_path):
+    filePath = tmp_path / "invalid.json"
+    filePath.write_text("{bad json}")
+    return filePath
+
 @pytest.fixture
 def sample_directory(tmp_path):
     directoryPath = tmp_path / "subdir"

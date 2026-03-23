@@ -202,8 +202,9 @@ class Option[T]:
 
         return Some(tuple(values))
 
-    def MapN[R](self, func: Callable[..., R]) -> Option[R]:
-        return self.Map(lambda values: func(*values))
+    @staticmethod
+    def MapN[R](func: Callable[..., R], *options: Option[Any]) -> Option[R]:
+        return Option.All(*options).Map(lambda values: func(*values))
 
     def Flatten(self: Option[Option[T]]) -> Option[T]:
         return self.Bind(lambda inner: inner)

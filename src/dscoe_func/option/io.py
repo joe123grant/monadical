@@ -20,7 +20,7 @@ def ReadLines(
     path: str | Path | None, encoding: str = "utf-8", strip: bool = False
 ) -> Option[list[str]]:
     def _ReadLines(filePath: Path) -> list[str]:
-        lines = filePath.read_text(encoding=encoding).splitlines()
+        lines = filePath.read_text(encoding=encoding).splitlines(keepends=True)
         if strip:
             return [line.strip() for line in lines if line.strip()]
         return lines

@@ -141,16 +141,16 @@ def test_parse_enum_returns_empty_for_invalid_inputs(text, sample_enum):
     assert result.IsEmpty()
  
 def test_parse_regex_returns_some_for_matching_text():
-    result = ParseRegex(r"(?P<number>\\d+)", "123", group="number")
+    result = ParseRegex(r"(?P<number>\d+)", "123", group="number")
     assert result.IsSome()
     assert result.Unwrap() == "123"
  
 @pytest.mark.parametrize(
     ("pattern", "text", "group"),
     [
-        (r"(?P<number>\\d+)", None, "number"),
-        (r"(?P<number>\\d+)", "abc", "number"),
-        (r"(?P<number>\\d+)", "123", "missing"),
+        (r"(?P<number>\d+)", None, "number"),
+        (r"(?P<number>\d+)", "abc", "number"),
+        (r"(?P<number>\d+)", "123", "missing"),
     ],
 )
 def test_parse_regex_returns_empty_for_invalid_inputs(pattern, text, group):

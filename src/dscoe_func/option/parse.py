@@ -82,7 +82,7 @@ def ParseEnum(value: str | None, enumType: type[Enum], caseSensitive: bool = Fal
         .Bind(_Lookup)
     )
 
-def ParseRegex(value: str | None, pattern: str, group: int | str = 0) -> Option[str]:
+def ParseRegex(pattern: str, value: str | None, group: int | str = 0) -> Option[str]:
     return (
         Option.FromNullableString(value)
         .Bind(lambda text: Option.FromNullable(re.search(pattern, text)))
