@@ -6,7 +6,6 @@ from pathlib import Path
 from .result import Result
 from ..option.path import AsFile, AsDirectory, AsVisibleFile
 
-
 class EmptyFileError(Exception):
     pass
 
@@ -20,15 +19,12 @@ def RequireVisibleFile(path: str | Path | None) -> Result[Path]:
     return AsVisibleFile(path).Match(Result.Success, lambda: Result.Fail(ValueError(f"Not a valid or visible file: {path!r}")))
 
 def ComputeFileHash(path: Path) -> Result[str]:
-    def _Compute() -> str:
+    def _ComputeHash() -> str:
         if path.stat().st_size == 0:
             raise EmptyFileError(f"File {path.name!r} is empty (0 bytes).")
-
         digest = hashlib.sha256()
         with path.open("rb") as file:
             while chunk := file.read(4096):
                 digest.update(chunk)
         return digest.hexdigest()
-
-    return Result.Try(_Compute)
-
+    return Result.Try(_ComputeHash)
