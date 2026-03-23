@@ -9,12 +9,16 @@ from .result import Result
 
 
 def ReadText(path: str | Path | None, encoding: str = "utf-8") -> Result[str]:
-    return RequireFile(path).Bind(lambda filePath: Result.Try(lambda: filePath.read_text(encoding=encoding)))
+    return RequireFile(path).Bind(
+        lambda filePath: Result.Try(lambda: filePath.read_text(encoding=encoding))
+    )
 
 def ReadBytes(path: str | Path | None) -> Result[bytes]:
     return RequireFile(path).Bind(lambda filePath: Result.Try(lambda: filePath.read_bytes()))
 
-def ReadLines(path: str | Path | None, encoding: str = "utf-8", strip: bool = False) -> Result[list[str]]:
+def ReadLines(
+    path: str | Path | None, encoding: str = "utf-8", strip: bool = False
+) -> Result[list[str]]:
     def _ReadLines(filePath: Path) -> list[str]:
         lines = filePath.read_text(encoding=encoding).splitlines()
         if strip:

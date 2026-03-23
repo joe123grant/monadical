@@ -19,7 +19,10 @@ class Result[T]:
         return Failure(error)
 
     @staticmethod
-    def Try(action: Callable[[], T], errorMapper: Callable[[Exception], Exception] = lambda exception: exception) -> Result[T]:
+    def Try(
+        action: Callable[[], T],
+        errorMapper: Callable[[Exception], Exception] = lambda exception: exception,
+    ) -> Result[T]:
         try:
             return Result.Success(action())
         except Exception as exception:
@@ -112,7 +115,9 @@ class Result[T]:
                 return Failure(exception)
         return self.Match(_OnSuccess, Failure)
 
-    def BiMap[U](self, onSuccess: Callable[[T], U], onFailure: Callable[[Exception], Exception]) -> Result[U]:
+    def BiMap[U](
+        self, onSuccess: Callable[[T], U], onFailure: Callable[[Exception], Exception]
+    ) -> Result[U]:
         match self:
             case Ok(value=value):
                 try:
@@ -136,7 +141,9 @@ class Result[T]:
         return self.Match(_OnSuccess, Failure)
 
     def Filter(self, predicate: Callable[[T], bool], error: Exception) -> Result[T]:
-        return self.Match(lambda value: self if predicate(value) else Result.Fail(error), lambda _: self)
+        return self.Match(
+            lambda value: self if predicate(value) else Result.Fail(error), lambda _: self
+        )
 
     def OrElse(self, fallback: Callable[[], Result[T]]) -> Result[T]:
         return self if self.IsSuccess() else fallback()
@@ -153,7 +160,11 @@ class Result[T]:
             return self
         return self.Match(_OnSuccess, lambda _: self)
 
-    def TryTap(self, action: Callable[[T], None], errorMapper: Callable[[Exception], Exception] = lambda exception: exception) -> Result[T]:
+    def TryTap(
+        self,
+        action: Callable[[T], None],
+        errorMapper: Callable[[Exception], Exception] = lambda exception: exception,
+    ) -> Result[T]:
         def _OnSuccess(value: T) -> Result[T]:
             try:
                 action(value)
@@ -168,7 +179,11 @@ class Result[T]:
             return self
         return self.Match(lambda _: self, _OnFailure)
 
-    def TryTapFail(self, action: Callable[[Exception], None], errorMapper: Callable[[Exception], Exception] = lambda exception: exception) -> Result[T]:
+    def TryTapFail(
+        self,
+        action: Callable[[Exception], None],
+        errorMapper: Callable[[Exception], Exception] = lambda exception: exception,
+    ) -> Result[T]:
         def _OnFailure(error: Exception) -> Result[T]:
             try:
                 action(error)
@@ -213,8 +228,16 @@ class Result[T]:
     def Fold[S](self, state: S, folder: Callable[[S, T], S]) -> S:
         return self.Match(lambda value: folder(state, value), lambda _: state)
 
-    def BiFold[S](self, state: S, successFolder: Callable[[S, T], S], failureFolder: Callable[[S, Exception], S]) -> S:
-        return self.Match(lambda value: successFolder(state, value), lambda error: failureFolder(state, error))
+    def BiFold[S](
+        self,
+        state: S,
+        successFolder: Callable[[S, T], S],
+        failureFolder: Callable[[S, Exception], S],
+    ) -> S:
+        return self.Match(
+            lambda value: successFolder(state, value),
+            lambda error: failureFolder(state, error),
+        )
 
     def ToList(self) -> list[T]:
         return self.Match(lambda value: [value], lambda _: [])
@@ -222,7 +245,11 @@ class Result[T]:
     def ToNullable(self) -> T | None:
         return self.Match(lambda value: value, lambda _: None)
 
-    async def MatchAsync[R](self, onSuccess: Callable[[T], Awaitable[R]], onFailure: Callable[[Exception], Awaitable[R]]) -> R:
+    async def MatchAsync[R](
+        self,
+        onSuccess: Callable[[T], Awaitable[R]],
+        onFailure: Callable[[Exception], Awaitable[R]],
+    ) -> R:
         match self:
             case Ok(value=value):
                 return await onSuccess(value)

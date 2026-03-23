@@ -11,13 +11,21 @@ class EmptyFileError(Exception):
     pass
 
 def RequireFile(path: str | Path | None) -> Result[Path]:
-    return AsFile(path).Match(Result.Success, lambda: Result.Fail(ValueError(f"Not a valid file: {path!r}")))
+    return AsFile(path).Match(
+        Result.Success, lambda: Result.Fail(ValueError(f"Not a valid file: {path!r}"))
+    )
 
 def RequireDirectory(path: str | Path | None) -> Result[Path]:
-    return AsDirectory(path).Match(Result.Success, lambda: Result.Fail(ValueError(f"Not a valid directory: {path!r}")))
+    return AsDirectory(path).Match(
+        Result.Success,
+        lambda: Result.Fail(ValueError(f"Not a valid directory: {path!r}")),
+    )
 
 def RequireVisibleFile(path: str | Path | None) -> Result[Path]:
-    return AsVisibleFile(path).Match(Result.Success, lambda: Result.Fail(ValueError(f"Not a valid or visible file: {path!r}")))
+    return AsVisibleFile(path).Match(
+        Result.Success,
+        lambda: Result.Fail(ValueError(f"Not a valid or visible file: {path!r}")),
+    )
 
 def ComputeFileHash(path: Path) -> Result[str]:
     def _ComputeHash() -> str:

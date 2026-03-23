@@ -33,11 +33,15 @@ def ParseDecimal(value: str | None) -> Option[Decimal]:
         .Filter(lambda decimal: decimal.is_finite())
     )
 
-def ParseBool(value: Any, truthy: frozenset[str] = _TRUTHY, falsy: frozenset[str] = _FALSY) -> Option[bool]:
+def ParseBool(
+    value: Any, truthy: frozenset[str] = _TRUTHY, falsy: frozenset[str] = _FALSY
+) -> Option[bool]:
     return (
         Option.FromNullableString(str(value) if value is not None else None, strip=True)
         .Map(str.lower)
-        .Bind(lambda lowered: Option.FromBool(lowered in truthy, True) | Option.FromBool(lowered in falsy, False))
+        .Bind(lambda lowered: (
+            Option.FromBool(lowered in truthy, True) | Option.FromBool(lowered in falsy, False)
+        ))
     )
 
 def ParseDate(value: str | None, format: str = "%Y-%m-%d") -> Option[date]:
@@ -82,5 +86,9 @@ def ParseRegex(value: str | None, pattern: str, group: int | str = 0) -> Option[
     return (
         Option.FromNullableString(value)
         .Bind(lambda text: Option.FromNullable(re.search(pattern, text)))
-        .Bind(lambda matchResult: Option.Try(lambda: matchResult.group(group), (IndexError, re.error)))
+        .Bind(
+            lambda matchResult: Option.Try(
+                lambda: matchResult.group(group), (IndexError, re.error)
+            )
+        )
     )

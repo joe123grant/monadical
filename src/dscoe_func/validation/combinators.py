@@ -23,7 +23,9 @@ def Sequence(validations: Iterable[Validation[Any, Any]]) -> Validation[list[Any
                 errors.extend(itemErrors)
     return Invalid(errors) if errors else Valid(values)
 
-def Traverse(items: Iterable[Any], func: Callable[[Any], Validation[Any, Any]]) -> Validation[list[Any], Any]:
+def Traverse(
+    items: Iterable[Any], func: Callable[[Any], Validation[Any, Any]]
+) -> Validation[list[Any], Any]:
     return Sequence(func(item) for item in items)
 
 def Partition(validations: Iterable[Validation[Any, Any]]) -> tuple[list[Any], list[Any]]:

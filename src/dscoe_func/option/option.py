@@ -93,7 +93,9 @@ class Option[T]:
         return self.Match(func, Option.Empty)
 
     def Filter(self, predicate: Callable[[T], bool]) -> Option[T]:
-        return self.Match(lambda value: Some(value) if predicate(value) else Option.Empty(), Option.Empty)
+        return self.Match(
+            lambda value: Some(value) if predicate(value) else Option.Empty(), Option.Empty
+        )
 
     @staticmethod
     def FromNullable(value: T | None) -> Option[T]:
@@ -120,7 +122,10 @@ class Option[T]:
         return Some(valueFactory()) if predicate else Option.Empty()
 
     @staticmethod
-    def Try(action: Callable[[], T], exceptions: type[BaseException] | tuple[type[BaseException], ...] = Exception) -> Option[T]:
+    def Try(
+        action: Callable[[], T],
+        exceptions: type[BaseException] | tuple[type[BaseException], ...] = Exception,
+    ) -> Option[T]:
         try:
             return Some(action())
         except exceptions:
@@ -150,7 +155,9 @@ class Option[T]:
     def Fold[S](self, state: S, folder: Callable[[S, T], S]) -> S:
         return self.Match(lambda value: folder(state, value), lambda: state)
 
-    def BiFold[S](self, state: S, someFolder: Callable[[S, T], S], emptyFolder: Callable[[S], S]) -> S:
+    def BiFold[S](
+        self, state: S, someFolder: Callable[[S, T], S], emptyFolder: Callable[[S], S]
+    ) -> S:
         return self.Match(lambda value: someFolder(state, value), lambda: emptyFolder(state))
 
     def Tap(self, action: Callable[[T], None]) -> Option[T]:
@@ -207,7 +214,9 @@ class Option[T]:
     def ToNullable(self) -> T | None:
         return self.Match(lambda value: value, lambda: None)
 
-    async def MatchAsync[R](self, onSome: Callable[[T], Awaitable[R]], onEmpty: Callable[[], Awaitable[R]]) -> R:
+    async def MatchAsync[R](
+        self, onSome: Callable[[T], Awaitable[R]], onEmpty: Callable[[], Awaitable[R]]
+    ) -> R:
         return await self.Match(onSome, onEmpty)
     
     async def MapAsync[U](self, action: Callable[[T], Awaitable[U]]) -> Option[U]:

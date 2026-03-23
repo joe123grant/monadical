@@ -1,6 +1,10 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ..result.result import Result
 
 
 class State[S, A]:
@@ -84,7 +88,9 @@ class State[S, A]:
     def Fold[B](self, initial: B, folder: Callable[[B, A], B]) -> State[S, B]:
         return self.Map(lambda value: folder(initial, value))
 
-    def BiFold[B](self, initial: B, valueFolder: Callable[[B, A], B], stateFolder: Callable[[B, S], B]) -> State[S, B]:
+    def BiFold[B](
+        self, initial: B, valueFolder: Callable[[B, A], B], stateFolder: Callable[[B, S], B]
+    ) -> State[S, B]:
         def _Run(state: S) -> tuple[B, S]:
             value, nextState = self._run(state)
             folded = valueFolder(initial, value)
@@ -113,7 +119,9 @@ class State[S, A]:
             return value, state
         return State(_Run)
 
-    def Zoom[BigS](self, getter: Callable[[BigS], S], setter: Callable[[BigS, S], BigS]) -> State[BigS, A]:
+    def Zoom[BigS](
+        self, getter: Callable[[BigS], S], setter: Callable[[BigS, S], BigS]
+    ) -> State[BigS, A]:
         def _Run(bigState: BigS) -> tuple[A, BigS]:
             value, newSmallState = self._run(getter(bigState))
             return value, setter(bigState, newSmallState)

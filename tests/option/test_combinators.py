@@ -4,6 +4,7 @@ from dscoe_func.option.combinators import Choose, Partition, Sequence, Somes, Tr
 from dscoe_func.option.option import Option
 from dscoe_func.option.parse import ParseInt
 
+
 def test_somes_returns_only_present_values():
     values = Somes([Option.Some(1), Option.Empty(), Option.Some(3)])
     assert values == [1, 3]

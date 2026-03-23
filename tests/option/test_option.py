@@ -255,7 +255,10 @@ def test_zip_n_delegates_to_all():
     assert result == Option.Some((1, 2))
  
 def test_map_n_unpacks_values_into_function():
-    result = Option.MapN(lambda first, second, third: first + second + third, Option.Some(1), Option.Some(2), Option.Some(3))
+    result = Option.MapN(
+        lambda first, second, third: first + second + third,
+        Option.Some(1), Option.Some(2), Option.Some(3),
+    )
     assert result == Option.Some(6)
  
 def test_flatten_removes_one_layer_of_option():
@@ -343,7 +346,8 @@ async def test_match_async_uses_empty_branch():
     assert result == 0
  
 def test_bind_left_identity_law():
-    function = lambda value: Option.Some(value + 1)
+    def function(value):
+        return Option.Some(value + 1)
     assert Option.Some(5).Bind(function) == function(5)
  
 def test_bind_right_identity_law_for_some():
@@ -356,8 +360,10 @@ def test_bind_right_identity_law_for_empty():
  
 def test_bind_associativity_law():
     option = Option.Some(5)
-    first = lambda value: Option.Some(value + 2)
-    second = lambda value: Option.Some(value * 3)
+    def first(value):
+        return Option.Some(value + 2)
+    def second(value):
+        return Option.Some(value * 3)
  
     left = option.Bind(first).Bind(second)
     right = option.Bind(lambda value: first(value).Bind(second))

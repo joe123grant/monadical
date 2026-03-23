@@ -122,7 +122,9 @@ class Validation[T, E]:
     def Catch[E2](self, func: Callable[[list[E]], Validation[T, E2]]) -> Validation[T, E2]:
         return self.Match(Valid, func)
 
-    def Apply[U, R](self, other: Validation[U, E], combiner: Callable[[T, U], R]) -> Validation[R, E]:
+    def Apply[U, R](
+        self, other: Validation[U, E], combiner: Callable[[T, U], R]
+    ) -> Validation[R, E]:
         match self, other:
             case Valid(value=leftValue), Valid(value=rightValue):
                 return Valid(combiner(leftValue, rightValue))
@@ -136,7 +138,10 @@ class Validation[T, E]:
                 assert_never(self)
 
     def Filter(self, predicate: Callable[[T], bool], error: E) -> Validation[T, E]:
-        return self.Match(lambda value: self if predicate(value) else Validation.Fail([error]), lambda _: self)
+        return self.Match(
+            lambda value: self if predicate(value) else Validation.Fail([error]),
+            lambda _: self,
+        )
 
     def Tap(self, action: Callable[[T], None]) -> Validation[T, E]:
         def _OnOk(value: T) -> Validation[T, E]:
@@ -191,8 +196,13 @@ class Validation[T, E]:
     def Fold[S](self, state: S, folder: Callable[[S, T], S]) -> S:
         return self.Match(lambda value: folder(state, value), lambda _: state)
 
-    def BiFold[S](self, state: S, okFolder: Callable[[S, T], S], errorFolder: Callable[[S, list[E]], S]) -> S:
-        return self.Match(lambda value: okFolder(state, value), lambda errors: errorFolder(state, errors))
+    def BiFold[S](
+        self, state: S, okFolder: Callable[[S, T], S], errorFolder: Callable[[S, list[E]], S]
+    ) -> S:
+        return self.Match(
+            lambda value: okFolder(state, value),
+            lambda errors: errorFolder(state, errors),
+        )
 
     def MapN[R](self, func: Callable[..., R]) -> Validation[R, E]:
         return self.Map(lambda values: func(*values))
@@ -217,7 +227,9 @@ class Validation[T, E]:
         from ..result import Result
         return self.Match(Result.Success, lambda errors: Result.Fail(errorMapper(errors)))
 
-    async def MatchAsync[R](self, onOk: Callable[[T], Awaitable[R]], onError: Callable[[list[E]], Awaitable[R]]) -> R:
+    async def MatchAsync[R](
+        self, onOk: Callable[[T], Awaitable[R]], onError: Callable[[list[E]], Awaitable[R]]
+    ) -> R:
         match self:
             case Valid(value=value):
                 return await onOk(value)
@@ -235,7 +247,9 @@ class Validation[T, E]:
             case _:
                 assert_never(self)
 
-    async def BindAsync[U](self, func: Callable[[T], Awaitable[Validation[U, E]]]) -> Validation[U, E]:
+    async def BindAsync[U](
+        self, func: Callable[[T], Awaitable[Validation[U, E]]]
+    ) -> Validation[U, E]:
         match self:
             case Valid(value=value):
                 return await func(value)

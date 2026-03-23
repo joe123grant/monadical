@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dscoe_func.option.env import GetEnv, GetEnvBool, GetEnvFloat, GetEnvInt
 
+
 def test_get_env_returns_some_for_present_value(monkeypatch):
     monkeypatch.setenv("OPTION_TEST_VALUE", "hello")
     result = GetEnv("OPTION_TEST_VALUE")
